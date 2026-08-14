@@ -1,0 +1,2 @@
+-- Bundled templates are seeded by core/TemplateSeeder.php (see core/migrate.php).
+-- This migration file is a no-op placeholder for version ordering.

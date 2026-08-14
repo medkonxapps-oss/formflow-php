@@ -1,0 +1,18 @@
+# Local configuration (copy from config.sample.php)
+config.php
+
+# User uploads (keep directory, ignore contents)
+uploads/*
+!uploads/.htaccess
+!uploads/.gitkeep
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Release build artifacts (local)
+formflow-*.zip
+/dist/
