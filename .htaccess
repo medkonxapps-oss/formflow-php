@@ -9,6 +9,7 @@ Options -Indexes
 
     RewriteRule ^core/ - [F,L]
     RewriteRule ^includes/ - [F,L]
+    RewriteRule ^unused/ - [F,L]
     RewriteRule ^uploads/ - [F,L]
     RewriteRule ^config\.php$ - [F,L]
     RewriteRule ^config\.sample\.php$ - [F,L]
@@ -25,6 +26,7 @@ Options -Indexes
 <IfModule !mod_rewrite.c>
     RedirectMatch 403 ^/core/
     RedirectMatch 403 ^/includes/
+    RedirectMatch 403 ^/unused/
 </IfModule>
 
 <Files "config.php">

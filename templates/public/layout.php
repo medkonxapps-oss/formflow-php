@@ -14,8 +14,9 @@
             <a href="/" class="text-lg font-semibold tracking-tight text-gray-900">
                 <?= htmlspecialchars($appName ?? 'FormFlow', ENT_QUOTES, 'UTF-8') ?>
             </a>
-            <nav class="text-sm text-gray-600">
-                <a href="/health" class="hover:text-gray-900">System Status</a>
+    <nav class="text-sm text-gray-600 flex gap-4">
+                <a href="/health" class="hover:text-gray-900">Status</a>
+                <a href="/login" class="hover:text-gray-900">Sign in</a>
             </nav>
         </div>
     </header>

@@ -81,6 +81,7 @@ class Router
 
     $pageTitle = $route['title'] ?? $this->config['app']['name'] ?? 'FormFlow';
     $appName = $this->config['app']['name'] ?? 'FormFlow';
+    $config = $this->config;
     $auth = new Auth($this->config);
     $currentUser = $auth->user();
 
@@ -238,6 +239,36 @@ class Router
 
     if ($class === 'SettingsController') {
       $controller = new SettingsController($this->config);
+      if (!method_exists($controller, $method)) {
+        $this->renderError(500, 'Action not found.');
+        return;
+      }
+      $controller->{$method}();
+      return;
+    }
+
+    if ($class === 'ApiController') {
+      $controller = new ApiController($this->config, $this->routeParams);
+      if (!method_exists($controller, $method)) {
+        $this->renderError(500, 'Action not found.');
+        return;
+      }
+      $controller->{$method}();
+      return;
+    }
+
+    if ($class === 'ViewController') {
+      $controller = new ViewController($this->config, $this->routeParams);
+      if (!method_exists($controller, $method)) {
+        $this->renderError(500, 'Action not found.');
+        return;
+      }
+      $controller->{$method}();
+      return;
+    }
+
+    if ($class === 'AbTestController') {
+      $controller = new AbTestController($this->config);
       if (!method_exists($controller, $method)) {
         $this->renderError(500, 'Action not found.');
         return;

@@ -5,10 +5,10 @@ declare(strict_types=1);
 /**
  * Build a GitHub release ZIP (excludes config.php and local uploads).
  *
- * Usage: php core/build-release-zip.php
+ * Usage: php unused/scripts/build-release-zip.php
  */
 
-$root = dirname(__DIR__);
+$root = dirname(__DIR__, 2);
 $version = '1.0.0';
 $zipName = "formflow-{$version}.zip";
 $zipPath = $root . DIRECTORY_SEPARATOR . $zipName;
@@ -81,12 +81,12 @@ $zipVerify->open($zipPath);
 $zipVerify->extractTo($temp);
 $zipVerify->close();
 
-passthru('"' . PHP_BINARY . '" "' . $root . '/core/verify-release-package.php" "' . $temp . '"', $code);
+passthru('"' . PHP_BINARY . '" "' . $root . '/unused/scripts/verify-release-package.php" "' . $temp . '"', $code);
 
 // Optional: simulate install if local config.php exists (dev machine only)
 $configPath = $root . '/config.php';
 if ($code === 0 && is_readable($configPath)) {
-    passthru('"' . PHP_BINARY . '" "' . $root . '/core/simulate-install-test.php" "' . $temp . '"', $installCode);
+    passthru('"' . PHP_BINARY . '" "' . $root . '/unused/scripts/simulate-install-test.php" "' . $temp . '"', $installCode);
     $code = $installCode !== 0 ? $installCode : $code;
 }
 

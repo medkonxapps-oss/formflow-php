@@ -48,19 +48,76 @@ class SubmissionController
     $ids = array_map('intval', (array) ($_POST['submission_ids'] ?? []));
     $ids = array_values(array_filter($ids, fn ($id) => $id > 0));
 
-    if ($user === null || $formId <= 0 || $action === '') {
-      redirect('/admin/forms');
+    if ($user === null || $action === '') {
+      redirect('/admin/submissions');
     }
 
-    if ($this->forms->findForUser($formId, (int) $user['id']) === null) {
+    if ($formId > 0 && $this->forms->findForUser($formId, (int) $user['id']) === null) {
       flash('error', 'Form not found.');
-      redirect('/admin/forms');
+      redirect('/admin/submissions');
     }
 
-    $count = $this->submissions->bulkAction($formId, (int) $user['id'], $action, $ids);
+    $count = $this->submissions->bulkAction((int) $user['id'], $action, $ids, $formId);
     Csrf::rotate();
-    flash('success', "Updated {$count} submission(s).");
-    redirect($this->returnUrl($formId));
+    if ($count === 0) {
+      flash('error', 'No submissions were updated. Select at least one row and a bulk action.');
+    } else {
+      flash('success', "Updated {$count} submission(s).");
+    }
+
+    $redirectUrl = $formId > 0 ? "/admin/submissions?form_id={$formId}" : "/admin/submissions";
+    redirect($redirectUrl);
+  }
+
+  public function single(): void
+  {
+    $this->requireEditor();
+    if (!Csrf::verifyRequest()) {
+      flash('error', 'Invalid security token.');
+      redirect('/admin/submissions');
+    }
+
+    $user = $this->auth->user();
+    $formId = (int) ($_POST['form_id'] ?? 0);
+    $submissionId = (int) ($_POST['submission_id'] ?? 0);
+    $action = (string) ($_POST['bulk_action'] ?? '');
+
+    if ($user === null || $formId <= 0 || $submissionId <= 0 || $action === '') {
+      flash('error', 'Invalid action.');
+      redirect('/admin/submissions');
+    }
+
+    $count = $this->submissions->bulkAction((int) $user['id'], $action, [$submissionId], $formId);
+    Csrf::rotate();
+    flash($count > 0 ? 'success' : 'error', $count > 0 ? 'Submission updated.' : 'Could not update submission.');
+
+    if ($action === 'delete') {
+      redirect('/admin/submissions');
+    }
+    redirect('/admin/forms/' . $formId . '/submissions/' . $submissionId);
+  }
+
+  public function addNote(): void
+  {
+    $this->requireEditor();
+    if (!Csrf::verifyRequest()) {
+      flash('error', 'Invalid security token.');
+      redirect('/admin/submissions');
+    }
+
+    $user = $this->auth->user();
+    $formId = (int) ($_POST['form_id'] ?? 0);
+    $submissionId = (int) ($_POST['submission_id'] ?? 0);
+    $body = (string) ($_POST['body'] ?? '');
+
+    if ($user === null || $formId <= 0 || $submissionId <= 0) {
+      redirect('/admin/submissions');
+    }
+
+    $ok = $this->submissions->addNote($submissionId, $formId, (int) $user['id'], $body);
+    Csrf::rotate();
+    flash($ok ? 'success' : 'error', $ok ? 'Note added.' : 'Could not add note.');
+    redirect('/admin/forms/' . $formId . '/submissions/' . $submissionId);
   }
 
   public function export(): void
@@ -72,28 +129,86 @@ class SubmissionController
     $user = $this->auth->user();
     $formId = (int) ($this->routeParams['formId'] ?? $_GET['form_id'] ?? 0);
 
-    if ($user === null || $formId <= 0) {
-      http_response_code(404);
-      exit;
-    }
-
-    $form = $this->forms->findForUser($formId, (int) $user['id']);
-    if ($form === null) {
+    if ($user === null) {
       http_response_code(404);
       exit;
     }
 
     $filters = $this->filtersFromRequest();
-    $rows = $this->submissions->exportForForm($formId, (int) $user['id'], $filters);
-    $fields = is_array($form['fields']) ? $form['fields'] : [];
 
+    if ($formId > 0) {
+      $form = $this->forms->findForUser($formId, (int) $user['id']);
+      if ($form === null) {
+        http_response_code(404);
+        exit;
+      }
+      $rows = $this->submissions->exportForForm($formId, (int) $user['id'], $filters);
+      $columns = $this->fieldColumns(is_array($form['fields'] ?? null) ? $form['fields'] : []);
+      $slug = (string) ($form['slug'] ?? 'form');
+    } else {
+      $rows = $this->submissions->exportForUser((int) $user['id'], $filters);
+      $columns = $this->unionFieldColumns($rows);
+      $slug = 'all';
+    }
+
+    while (ob_get_level() > 0) {
+      ob_end_clean();
+    }
+
+    $filename = 'submissions-' . preg_replace('/[^a-z0-9_-]+/i', '-', $slug) . '-' . gmdate('Y-m-d') . '.csv';
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Cache-Control: no-store');
+
+    $out = fopen('php://output', 'w');
+    if ($out === false) {
+      exit;
+    }
+
+    // UTF-8 BOM so Excel does not scramble non-English / special characters.
+    fwrite($out, "\xEF\xBB\xBF");
+
+    $header = ['ID', 'Form', 'Submitted At', 'IP', 'Referrer', 'Read', 'Starred', 'Spam'];
+    foreach ($columns as $label) {
+      $header[] = $label;
+    }
+    $this->writeCsvRow($out, $header);
+
+    foreach ($rows as $row) {
+      $data = is_array($row['data'] ?? null) ? $row['data'] : [];
+      $line = [
+        (string) ($row['id'] ?? ''),
+        (string) ($row['form_name'] ?? ($form['name'] ?? '')),
+        (string) ($row['created_at'] ?? ''),
+        (string) ($row['ip_address'] ?? ''),
+        (string) ($row['referrer'] ?? ''),
+        !empty($row['is_read']) ? 'Yes' : 'No',
+        !empty($row['is_starred']) ? 'Yes' : 'No',
+        !empty($row['is_spam']) ? 'Yes' : 'No',
+      ];
+      foreach (array_keys($columns) as $fieldId) {
+        $line[] = $this->csvValue($data[$fieldId] ?? '');
+      }
+      $this->writeCsvRow($out, $line);
+    }
+
+    fclose($out);
+    exit;
+  }
+
+  /**
+   * @param list<array<string, mixed>> $fields
+   * @return array<string, string> field_id => label
+   */
+  private function fieldColumns(array $fields): array
+  {
     $columns = [];
     foreach ($fields as $field) {
       if (!is_array($field)) {
         continue;
       }
       $type = (string) ($field['type'] ?? '');
-      if (in_array($type, ['heading', 'paragraph'], true)) {
+      if (in_array($type, ['heading', 'paragraph', 'hidden'], true)) {
         continue;
       }
       $id = (string) ($field['id'] ?? '');
@@ -102,41 +217,68 @@ class SubmissionController
       }
     }
 
-    $filename = 'submissions-' . ($form['slug'] ?? 'export') . '-' . date('Y-m-d') . '.csv';
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    return $columns;
+  }
 
-    $out = fopen('php://output', 'w');
-    if ($out === false) {
-      exit;
-    }
-
-    $header = array_merge(['ID', 'Submitted At', 'IP', 'Referrer', 'Read', 'Starred', 'Spam'], array_values($columns));
-    fputcsv($out, $header);
-
+  /**
+   * @param list<array<string, mixed>> $rows
+   * @return array<string, string>
+   */
+  private function unionFieldColumns(array $rows): array
+  {
+    $columns = [];
     foreach ($rows as $row) {
       $data = is_array($row['data'] ?? null) ? $row['data'] : [];
-      $line = [
-        $row['id'] ?? '',
-        $row['created_at'] ?? '',
-        $row['ip_address'] ?? '',
-        $row['referrer'] ?? '',
-        !empty($row['is_read']) ? 'Yes' : 'No',
-        !empty($row['is_starred']) ? 'Yes' : 'No',
-        !empty($row['is_spam']) ? 'Yes' : 'No',
-      ];
-      foreach (array_keys($columns) as $fieldId) {
-        $val = $data[$fieldId] ?? '';
-        if (is_array($val)) {
-          $val = implode(', ', $val);
+      foreach ($data as $key => $value) {
+        $id = (string) $key;
+        if ($id === '' || isset($columns[$id])) {
+          continue;
         }
-        $line[] = $val;
+        $columns[$id] = $id;
       }
-      fputcsv($out, $line);
     }
 
-    fclose($out);
-    exit;
+    return $columns;
+  }
+
+  /**
+   * @param resource $out
+   * @param list<string> $line
+   */
+  private function writeCsvRow($out, array $line): void
+  {
+    // Empty escape char = RFC 4180 (Excel-safe). PHP's default backslash corrupts quotes.
+    fputcsv($out, $line, ',', '"', '');
+  }
+
+  private function csvValue(mixed $value): string
+  {
+    if ($value === null) {
+      return '';
+    }
+    if (is_bool($value)) {
+      return $value ? 'Yes' : 'No';
+    }
+    if (is_array($value)) {
+      $parts = [];
+      foreach ($value as $item) {
+        if (is_array($item)) {
+          $parts[] = json_encode($item, JSON_UNESCAPED_UNICODE);
+        } else {
+          $parts[] = (string) $item;
+        }
+      }
+      $value = implode('; ', $parts);
+    } else {
+      $value = (string) $value;
+    }
+
+    $value = str_replace(["\r\n", "\r"], "\n", $value);
+    if ($value !== '' && preg_match('/^[=+\-@]/', $value) === 1) {
+      $value = "'" . $value;
+    }
+
+    return $value;
   }
 
   private function requireEditor(): void

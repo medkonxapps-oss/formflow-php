@@ -15,6 +15,9 @@ class ConfigWriter
   public static function write(string $rootPath, array $data): bool
   {
     $path = $rootPath . '/config.php';
+    if ((is_file($path) && !is_writable($path)) || (!is_file($path) && !is_writable($rootPath))) {
+      return false;
+    }
 
     $app = $data['app'] ?? [];
     $database = $data['database'] ?? [];

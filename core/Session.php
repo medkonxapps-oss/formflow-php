@@ -47,6 +47,12 @@ class Session
 
     session_start();
     self::$started = true;
+
+    if (isset($_SESSION['_last_activity']) && (time() - (int) $_SESSION['_last_activity']) > $lifetime) {
+      $_SESSION = [];
+      session_regenerate_id(true);
+    }
+    $_SESSION['_last_activity'] = time();
   }
 
   public static function regenerate(): void

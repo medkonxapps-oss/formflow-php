@@ -110,6 +110,18 @@ class FormValidator
       if ($type === 'number' && !is_numeric($strVal)) {
         $errors[$id] = $customError !== '' ? $customError : 'Please enter a valid number.';
       }
+
+      if ($type === 'number' && is_numeric($strVal)) {
+        $num = (float) $strVal;
+        $minVal = $validation['min_value'] ?? null;
+        $maxVal = $validation['max_value'] ?? null;
+        if ($minVal !== null && $minVal !== '' && $num < (float) $minVal) {
+          $errors[$id] = $customError !== '' ? $customError : 'Value is too low.';
+        }
+        if ($maxVal !== null && $maxVal !== '' && $num > (float) $maxVal) {
+          $errors[$id] = $customError !== '' ? $customError : 'Value is too high.';
+        }
+      }
     }
 
     return $errors;

@@ -126,4 +126,41 @@ class AuthController
     flash('success', 'Your password has been reset. Please sign in.');
     redirect('/login');
   }
+
+  public function acceptInvite(): void
+  {
+    if (!Csrf::verifyRequest()) {
+      flash('error', 'Invalid security token.');
+      redirect('/login');
+    }
+
+    $token = (string) ($_POST['token'] ?? '');
+    $name = trim((string) ($_POST['name'] ?? ''));
+    $password = (string) ($_POST['password'] ?? '');
+    $passwordConfirm = (string) ($_POST['password_confirmation'] ?? '');
+
+    $invites = new InviteRepository($this->config);
+    $invite = $invites->findValidByToken($token);
+    if ($invite === null) {
+      flash('error', 'This invite link is invalid or has expired.');
+      redirect('/login');
+    }
+
+    if ($password !== $passwordConfirm) {
+      flash('error', 'Passwords do not match.');
+      redirect('/invite/' . rawurlencode($token));
+    }
+
+    $result = $this->auth->register($name, (string) $invite['email'], $password, (string) $invite['role'], true);
+    if (!$result['success']) {
+      flash('error', $result['error'] ?? 'Could not create account.');
+      redirect('/invite/' . rawurlencode($token));
+    }
+
+    $invites->markAccepted((int) $invite['id']);
+    $this->auth->attemptLogin((string) $invite['email'], $password, (string) ($_SERVER['REMOTE_ADDR'] ?? ''), (string) ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+    Csrf::rotate();
+    flash('success', 'Welcome to FormFlow.');
+    redirect('/admin');
+  }
 }

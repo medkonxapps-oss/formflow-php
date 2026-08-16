@@ -13,6 +13,11 @@ return [
             'layout' => 'public',
             'title' => 'Welcome',
         ],
+        '/preview/{slug}' => [
+            'handler' => 'public.form-preview',
+            'layout' => 'embed',
+            'title' => 'Form',
+        ],
         '/health' => [
             'handler' => 'health',
             'layout' => null,
@@ -41,7 +46,9 @@ return [
         ],
         '/invite/{token}' => [
             'handler' => 'auth.invite',
-            'layout' => null,
+            'layout' => 'auth',
+            'title' => 'Accept invite',
+            'middleware' => ['guest'],
         ],
         '/admin' => [
             'handler' => 'admin.dashboard',
@@ -57,22 +64,27 @@ return [
         ],
         '/admin/forms/new' => [
             'handler' => 'admin.forms.create',
-            'layout' => 'admin',
+            'layout' => 'admin/builder',
             'title' => 'New Form',
             'middleware' => ['auth', 'role:editor'],
         ],
         '/admin/forms/{id}/edit' => [
             'handler' => 'admin.forms.edit',
-            'layout' => 'admin',
+            'layout' => 'admin/builder',
             'title' => 'Edit Form',
             'middleware' => ['auth', 'role:editor'],
         ],
-        '/admin/forms/{formId}/submissions' => [
-            'handler' => 'admin.submissions.index',
+        '/admin/submissions' => [
+            'handler' => 'admin.submissions.all',
             'layout' => 'admin',
-            'title' => 'Submissions',
+            'title' => 'All Submissions',
             'middleware' => ['auth', 'role:viewer'],
         ],
+        '/admin/submissions/export' => [
+            'action' => 'SubmissionController@export',
+            'middleware' => ['auth', 'role:viewer'],
+        ],
+
         '/admin/forms/{formId}/submissions/{id}' => [
             'handler' => 'admin.submissions.show',
             'layout' => 'admin',
@@ -85,6 +97,18 @@ return [
         ],
         '/admin/forms/{formId}/analytics' => [
             'handler' => 'admin.forms.analytics',
+            'layout' => 'admin',
+            'title' => 'Analytics',
+            'middleware' => ['auth', 'role:viewer'],
+        ],
+        '/admin/forms/{formId}/ab-results' => [
+            'handler' => 'admin.forms.ab-results',
+            'layout' => 'admin',
+            'title' => 'A/B Test Results',
+            'middleware' => ['auth', 'role:viewer'],
+        ],
+        '/admin/analytics' => [
+            'handler' => 'admin.analytics',
             'layout' => 'admin',
             'title' => 'Analytics',
             'middleware' => ['auth', 'role:viewer'],
@@ -113,10 +137,28 @@ return [
             'action' => 'SubmissionFileController@download',
             'middleware' => ['auth', 'role:viewer'],
         ],
+        '/track/{slug}' => [
+            'action' => 'ViewController@track',
+        ],
+        '/api/v1/forms' => [
+            'action' => 'ApiController@forms',
+        ],
+        '/api/v1/submissions' => [
+            'action' => 'ApiController@submissions',
+        ],
+        '/api/v1/forms/{formId}/submissions/{id}' => [
+            'action' => 'ApiController@submission',
+        ],
     ],
     'OPTIONS' => [
         '/submit/{slug}' => [
             'action' => 'SubmitController@options',
+        ],
+        '/preview/{slug}' => [
+            'action' => 'ViewController@embedPreflight',
+        ],
+        '/track/{slug}' => [
+            'action' => 'ViewController@track',
         ],
     ],
     'POST' => [
@@ -134,6 +176,10 @@ return [
         ],
         '/reset-password' => [
             'action' => 'AuthController@resetPassword',
+            'middleware' => ['guest'],
+        ],
+        '/invite/accept' => [
+            'action' => 'AuthController@acceptInvite',
             'middleware' => ['guest'],
         ],
         '/admin/forms' => [
@@ -160,12 +206,28 @@ return [
             'action' => 'SubmissionController@bulk',
             'middleware' => ['auth', 'role:editor'],
         ],
+        '/admin/forms/variants/save' => [
+            'action' => 'AbTestController@save',
+            'middleware' => ['auth', 'role:editor'],
+        ],
+        '/admin/forms/variants/winner' => [
+            'action' => 'AbTestController@declareWinner',
+            'middleware' => ['auth', 'role:editor'],
+        ],
+        '/admin/submissions/action' => [
+            'action' => 'SubmissionController@single',
+            'middleware' => ['auth', 'role:editor'],
+        ],
         '/submit/{slug}' => [
             'action' => 'SubmitController@submit',
         ],
         '/admin/templates/use' => [
             'action' => 'FormController@useTemplate',
             'middleware' => ['auth', 'role:editor'],
+        ],
+        '/admin/settings/backup/import' => [
+            'action' => 'SettingsController@importBackup',
+            'middleware' => ['auth', 'role:admin'],
         ],
         '/admin/settings/general' => [
             'action' => 'SettingsController@saveGeneral',
@@ -190,6 +252,17 @@ return [
         '/admin/settings/api-keys/revoke' => [
             'action' => 'SettingsController@revokeApiKey',
             'middleware' => ['auth', 'role:admin'],
+        ],
+        '/admin/settings/team/invite' => [
+            'action' => 'SettingsController@sendInvite',
+            'middleware' => ['auth', 'role:admin'],
+        ],
+        '/admin/submissions/note' => [
+            'action' => 'SubmissionController@addNote',
+            'middleware' => ['auth', 'role:editor'],
+        ],
+        '/track/{slug}' => [
+            'action' => 'ViewController@track',
         ],
     ],
 ];

@@ -45,6 +45,11 @@ class SubmissionService
       $this->respondError($wantsJson, 404, [], 'Form not found.');
     }
 
+    $denied = SecurityGuard::denyReason($this->config, $ip);
+    if ($denied !== null) {
+      $this->respondError($wantsJson, 403, [], $denied);
+    }
+
     if (!CorsHandler::apply($form, $this->config)) {
       $this->respondError($wantsJson, 403, [], 'Origin not allowed.');
     }
@@ -55,7 +60,9 @@ class SubmissionService
 
     $settings = is_array($form['settings'] ?? null) ? $form['settings'] : [];
     $rateLimit = is_array($settings['rate_limit'] ?? null) ? $settings['rate_limit'] : [];
-    $perMinute = (int) ($rateLimit['per_minute'] ?? 10);
+    $globalLimit = (int) (is_array($this->config['security'] ?? null) ? ($this->config['security']['rate_limit_per_minute'] ?? 10) : 10);
+    $formLimit = (int) ($rateLimit['per_minute'] ?? $globalLimit);
+    $perMinute = max(1, min($formLimit, max(1, $globalLimit)));
 
     $limiter = new SubmissionRateLimiter($this->config);
     if ($limiter->isLimited((int) $form['id'], $ip, $perMinute)) {
@@ -83,6 +90,9 @@ class SubmissionService
         $token = (string) ($payload['g-recaptcha-response'] ?? $_POST['g-recaptcha-response'] ?? '');
         unset($payload['g-recaptcha-response']);
         $secret = (string) ($spam['recaptcha_secret_key'] ?? '');
+        if ($secret === '') {
+          $secret = (string) (is_array($this->config['security'] ?? null) ? ($this->config['security']['recaptcha_secret_key'] ?? '') : '');
+        }
         $result = RecaptchaVerifier::verify($secret, $token, $ip);
         $failMode = (string) ($spam['recaptcha_fail_mode'] ?? 'closed');
 
@@ -166,6 +176,19 @@ class SubmissionService
 
       try {
         WebhookClient::dispatch($form, $submission);
+      } catch (\Throwable) {
+      }
+
+      // A/B Test: record conversion if visitor has a variant session
+      try {
+        $abSessionToken = (string) ($_COOKIE['ff_ab_session'] ?? '');
+        if ($abSessionToken !== '') {
+          (new AbTestRepository($this->config))->recordConversion(
+            (int) $form['id'],
+            $abSessionToken,
+            (int) $submissionId
+          );
+        }
       } catch (\Throwable) {
       }
     }

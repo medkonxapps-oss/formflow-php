@@ -71,7 +71,8 @@ class Migrator
       'remember_tokens', 'login_attempts', 'audit_log',
       'forms', 'submissions',
       'submission_files', 'submission_rate_log', 'submission_dedup',
-      'form_templates', 'api_keys',
+      'form_templates', 'api_keys', 'form_views', 'submission_notes',
+      'form_variants', 'form_variant_sessions', 'form_variant_conversions',
     ];
 
     foreach ($tables as $table) {

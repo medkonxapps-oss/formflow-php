@@ -30,7 +30,7 @@ class TemplateRepository
   public function listAll(): array
   {
     $stmt = $this->db->query(
-      "SELECT id, slug, name, description, category, sort_order, created_at
+      "SELECT id, slug, name, description, category, sort_order, created_at, fields_json
        FROM {$this->tbl}
        ORDER BY sort_order ASC, name ASC"
     );

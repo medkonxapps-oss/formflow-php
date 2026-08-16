@@ -19,23 +19,31 @@ class TemplateSeeder
     $inserted = 0;
 
     foreach (TemplateDefinitions::all() as $tpl) {
+      $params = [
+        $tpl['name'],
+        $tpl['description'],
+        $tpl['category'],
+        JsonColumn::encode($tpl['fields']),
+        JsonColumn::encode($tpl['settings']),
+        (int) $tpl['sort_order'],
+        $tpl['slug'],
+      ];
+
       $exists = $db->fetchOne("SELECT id FROM {$tbl} WHERE slug = ? LIMIT 1", [$tpl['slug']]);
       if ($exists !== null) {
+        $db->query(
+          "UPDATE {$tbl}
+           SET name = ?, description = ?, category = ?, fields_json = ?, settings_json = ?, sort_order = ?
+           WHERE slug = ?",
+          $params
+        );
         continue;
       }
 
       $db->query(
-        "INSERT INTO {$tbl} (slug, name, description, category, fields_json, settings_json, sort_order, created_at)
+        "INSERT INTO {$tbl} (name, description, category, fields_json, settings_json, sort_order, slug, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())",
-        [
-          $tpl['slug'],
-          $tpl['name'],
-          $tpl['description'],
-          $tpl['category'],
-          JsonColumn::encode($tpl['fields']),
-          JsonColumn::encode($tpl['settings']),
-          (int) $tpl['sort_order'],
-        ]
+        $params
       );
       $inserted++;
     }

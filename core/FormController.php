@@ -45,6 +45,8 @@ class FormController
       redirect('/admin/forms/new');
     }
 
+    $this->persistAbTest((int) $result['form_id']);
+
     Csrf::rotate();
     flash('success', 'Form created successfully.');
     redirect('/admin/forms/' . $result['form_id'] . '/edit');
@@ -70,6 +72,8 @@ class FormController
       flash('error', $result['error'] ?? 'Could not update form.');
       redirect('/admin/forms/' . $formId . '/edit');
     }
+
+    $this->persistAbTest($formId);
 
     Csrf::rotate();
     flash('success', 'Form saved successfully.');
@@ -234,6 +238,18 @@ class FormController
     ];
     $settings['allowed_domains'] = array_values($domains);
     $settings['webhook_url'] = trim((string) ($_POST['webhook_url'] ?? ''));
+    $settings['theme'] = [
+      'button_text' => trim((string) ($_POST['theme_button_text'] ?? 'Submit')) ?: 'Submit',
+      'button_color' => trim((string) ($_POST['theme_button_color'] ?? '#2563eb')) ?: '#2563eb',
+      'background_color' => trim((string) ($_POST['theme_background_color'] ?? '#ffffff')) ?: '#ffffff',
+      'label_color' => trim((string) ($_POST['theme_label_color'] ?? '#374151')) ?: '#374151',
+      'border_radius' => trim((string) ($_POST['theme_border_radius'] ?? '8')) ?: '8',
+      'max_width' => trim((string) ($_POST['theme_max_width'] ?? '600')) ?: '600',
+      'font_family' => trim((string) ($_POST['theme_font_family'] ?? 'inherit')) ?: 'inherit',
+    ];
+    $settings['ab_test'] = [
+      'enabled' => !empty($_POST['ab_test_enabled']),
+    ];
 
     return [
       'name' => trim((string) ($_POST['name'] ?? '')),
@@ -242,5 +258,24 @@ class FormController
       'fields' => is_array($fields) ? $fields : [],
       'settings' => $settings,
     ];
+  }
+
+  private function persistAbTest(int $formId): void
+  {
+    $enabled = !empty($_POST['ab_test_enabled']);
+    $raw = json_decode((string) ($_POST['variants_json'] ?? '[]'), true);
+    if (!$enabled || !is_array($raw) || $raw === []) {
+      return;
+    }
+
+    try {
+      $ab = new AbTestRepository($this->config);
+      $ab->saveVariants($formId, $raw);
+      $ab->enableForForm($formId);
+    } catch (\Throwable $e) {
+      if (FORMFLOW_DEBUG) {
+        error_log('A/B save failed: ' . $e->getMessage());
+      }
+    }
   }
 }

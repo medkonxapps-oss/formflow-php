@@ -5,10 +5,10 @@ declare(strict_types=1);
 /**
  * Verify a release tree is safe to ship and passes installer requirements.
  *
- * Usage: php core/verify-release-package.php [path-to-extracted-root]
+ * Usage: php unused/scripts/verify-release-package.php [path-to-extracted-root]
  */
 
-$root = isset($argv[1]) ? rtrim($argv[1], '/\\') : dirname(__DIR__);
+$root = isset($argv[1]) ? rtrim($argv[1], '/\\') : dirname(__DIR__, 2);
 
 $errors = [];
 

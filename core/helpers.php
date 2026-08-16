@@ -86,6 +86,11 @@ if (!function_exists('app_url')) {
   function app_url(array $config, string $path = ''): string
   {
     $base = rtrim((string) ($config['app']['url'] ?? ''), '/');
+    if ($base === '') {
+      $https = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+      $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+      $base = ($https ? 'https://' : 'http://') . $host;
+    }
     $path = '/' . ltrim($path, '/');
 
     return $base === '' ? $path : $base . $path;

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 define('FORMFLOW_DEBUG', false);
-require __DIR__ . '/ErrorHandler.php';
+require dirname(__DIR__, 2) . '/core/ErrorHandler.php';
 
 FormFlow\ErrorHandler::register();
 FormFlow\ErrorHandler::handleException(new Exception('audit-test'));

@@ -102,6 +102,11 @@ class Auth
     $ip = $this->normalizeIp($ip);
     $userAgent = substr($userAgent, 0, 512);
 
+    $denied = SecurityGuard::denyReason($this->config, $ip, false);
+    if ($denied !== null) {
+      return ['success' => false, 'error' => $denied];
+    }
+
     $backoff = $this->getBackoffSeconds($email);
     if ($backoff > 0) {
       return [
@@ -746,5 +751,20 @@ class Auth
     $requiredLevel = $hierarchy[$requiredRole] ?? 0;
 
     return $userLevel >= $requiredLevel;
+  }
+
+  /**
+   * @return list<array<string, mixed>>
+   */
+  public function listUsers(): array
+  {
+    $stmt = $this->db->query(
+      "SELECT id, name, email, role, last_login_at, created_at
+       FROM {$this->tblUsers}
+       ORDER BY created_at ASC"
+    );
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    return is_array($rows) ? $rows : [];
   }
 }

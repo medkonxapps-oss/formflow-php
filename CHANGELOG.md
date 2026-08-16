@@ -20,8 +20,9 @@ First public release — self-hosted form backend for shared hosting (PHP + MySQ
 - **Analytics** — per-form submissions over time, top referrers
 - **Templates** — seven bundled presets (Contact, Newsletter, Job Application, Event RSVP, NPS, Booking, Support Ticket)
 - **Settings** (admin) — general, SMTP with encrypted password, security, API keys, DB backup export
-- Installer runs `TemplateSeeder` after migrations (bundled templates on fresh install)
-- PDO buffered queries fix (installer + migrate reliability on MySQL)
+- **Security audit** — [SECURITY_AUDIT.md](SECURITY_AUDIT.md) and automated check scripts
+- Installer seeds bundled templates via `TemplateSeeder` after migrations
+- PDO buffered-query fix for reliable MySQL migrations on shared hosts
 
 ### Security
 

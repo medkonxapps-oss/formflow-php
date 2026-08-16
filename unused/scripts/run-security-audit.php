@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * Automated security checks for SECURITY_AUDIT.md generation.
  *
- * Usage: php core/run-security-audit.php [base_url]
+ * Usage: php unused/scripts/run-security-audit.php [base_url]
  */
 
 $base = rtrim($argv[1] ?? 'http://localhost:8000', '/');

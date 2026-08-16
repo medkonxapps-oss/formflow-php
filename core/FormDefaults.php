@@ -33,14 +33,30 @@ class FormDefaults
       'type' => $type,
       'label' => ucfirst(str_replace('-', ' ', $type)),
       'placeholder' => '',
+      'help_text' => '',
       'required' => !in_array($type, ['heading', 'paragraph', 'hidden'], true),
+      'width' => 'full',
+      'step' => 1,
       'validation' => [
         'min_length' => 0,
         'max_length' => 0,
+        'min_value' => null,
+        'max_value' => null,
         'regex' => '',
         'error_message' => '',
+        'accept' => '',
       ],
       'default' => '',
+      'conditional' => [
+        'enabled' => false,
+        'action' => 'show',
+        'match' => 'all',
+        'rules' => [],
+      ],
+      'style' => [
+        'css_class' => '',
+        'label_bold' => false,
+      ],
       'options' => in_array($type, ['select', 'radio', 'checkbox'], true)
         ? [['label' => 'Option 1', 'value' => 'option_1']]
         : [],
@@ -78,6 +94,18 @@ class FormDefaults
       ],
       'allowed_domains' => [],
       'webhook_url' => '',
+      'theme' => [
+        'button_text' => 'Submit',
+        'button_color' => '#2563eb',
+        'background_color' => '#ffffff',
+        'label_color' => '#374151',
+        'border_radius' => '8',
+        'max_width' => '600',
+        'font_family' => 'inherit',
+      ],
+      'ab_test' => [
+        'enabled' => false,
+      ],
     ];
   }
 }

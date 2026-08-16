@@ -67,6 +67,40 @@ class SubmissionRepository
   }
 
   /**
+   * @param array<string, mixed> $filters
+   * @return array{items: list<array<string, mixed>>, total: int, page: int, per_page: int}
+   */
+  public function listForUser(int $userId, array $filters = [], int $page = 1, int $perPage = 20): array
+  {
+    [$where, $params] = $this->buildWhereForUser($userId, $filters);
+    $offset = max(0, ($page - 1) * $perPage);
+
+    $countRow = $this->db->fetchOne(
+      "SELECT COUNT(*) AS cnt FROM {$this->tblSubmissions} s INNER JOIN {$this->tblForms} f ON f.id = s.form_id WHERE {$where}",
+      $params
+    );
+    $total = (int) ($countRow['cnt'] ?? 0);
+
+    $params[] = $perPage;
+    $params[] = $offset;
+
+    $stmt = $this->db->query(
+      "SELECT s.*, f.name AS form_name, f.slug AS form_slug 
+       FROM {$this->tblSubmissions} s
+       INNER JOIN {$this->tblForms} f ON f.id = s.form_id
+       WHERE {$where}
+       ORDER BY s.created_at DESC
+       LIMIT ? OFFSET ?",
+      $params
+    );
+
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $items = is_array($rows) ? array_map(fn ($r) => $this->hydrate($r), $rows) : [];
+
+    return ['items' => $items, 'total' => $total, 'page' => $page, 'per_page' => $perPage];
+  }
+
+  /**
    * @return array<string, mixed>|null
    */
   public function findForForm(int $submissionId, int $formId, int $userId): ?array
@@ -86,48 +120,80 @@ class SubmissionRepository
 
   /**
    * @param list<int> $ids
-   * @param array<string, mixed> $filters
    */
-  public function bulkAction(int $formId, int $userId, string $action, array $ids, array $filters = []): int
+  public function bulkAction(int $userId, string $action, array $ids, int $formId = 0): int
   {
-    if ($this->formRepository()->findForUser($formId, $userId) === null || $ids === []) {
+    $ids = array_values(array_unique(array_filter($ids, static fn ($id) => $id > 0)));
+    if ($ids === []) {
       return 0;
     }
 
-    $placeholders = implode(',', array_fill(0, count($ids), '?'));
-    $params = array_merge([$formId], $ids);
+    $allowed = $this->ownedIds($userId, $ids, $formId);
+    if ($allowed === []) {
+      return 0;
+    }
 
-    return match ($action) {
-      'read' => $this->db->query(
-        "UPDATE {$this->tblSubmissions} SET is_read = 1 WHERE form_id = ? AND id IN ({$placeholders})",
-        $params
-      )->rowCount(),
-      'unread' => $this->db->query(
-        "UPDATE {$this->tblSubmissions} SET is_read = 0 WHERE form_id = ? AND id IN ({$placeholders})",
-        $params
-      )->rowCount(),
-      'star' => $this->db->query(
-        "UPDATE {$this->tblSubmissions} SET is_starred = 1 WHERE form_id = ? AND id IN ({$placeholders})",
-        $params
-      )->rowCount(),
-      'unstar' => $this->db->query(
-        "UPDATE {$this->tblSubmissions} SET is_starred = 0 WHERE form_id = ? AND id IN ({$placeholders})",
-        $params
-      )->rowCount(),
-      'spam' => $this->db->query(
-        "UPDATE {$this->tblSubmissions} SET is_spam = 1 WHERE form_id = ? AND id IN ({$placeholders})",
-        $params
-      )->rowCount(),
-      'not_spam' => $this->db->query(
-        "UPDATE {$this->tblSubmissions} SET is_spam = 0 WHERE form_id = ? AND id IN ({$placeholders})",
-        $params
-      )->rowCount(),
-      'delete' => $this->db->query(
-        "DELETE FROM {$this->tblSubmissions} WHERE form_id = ? AND id IN ({$placeholders})",
-        $params
-      )->rowCount(),
-      default => 0,
+    $placeholders = implode(',', array_fill(0, count($allowed), '?'));
+
+    $set = match ($action) {
+      'read' => 'is_read = 1',
+      'unread' => 'is_read = 0',
+      'star' => 'is_starred = 1',
+      'unstar' => 'is_starred = 0',
+      'spam' => 'is_spam = 1',
+      'not_spam' => 'is_spam = 0',
+      'delete' => null,
+      default => false,
     };
+
+    if ($set === false) {
+      return 0;
+    }
+
+    if ($set === null) {
+      $stmt = $this->db->query(
+        "DELETE FROM {$this->tblSubmissions} WHERE id IN ({$placeholders})",
+        $allowed
+      );
+
+      return $stmt->rowCount();
+    }
+
+    $stmt = $this->db->query(
+      "UPDATE {$this->tblSubmissions} SET {$set} WHERE id IN ({$placeholders})",
+      $allowed
+    );
+
+    return $stmt->rowCount();
+  }
+
+  /**
+   * @param list<int> $ids
+   * @return list<int>
+   */
+  private function ownedIds(int $userId, array $ids, int $formId = 0): array
+  {
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $params = [$userId];
+    $formSql = '';
+    if ($formId > 0) {
+      $formSql = ' AND s.form_id = ?';
+      $params[] = $formId;
+    }
+    $params = array_merge($params, $ids);
+
+    $stmt = $this->db->query(
+      "SELECT s.id FROM {$this->tblSubmissions} s
+       INNER JOIN {$this->tblForms} f ON f.id = s.form_id
+       WHERE f.user_id = ?{$formSql} AND s.id IN ({$placeholders})",
+      $params
+    );
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (!is_array($rows)) {
+      return [];
+    }
+
+    return array_map(static fn (array $r): int => (int) $r['id'], $rows);
   }
 
   /**
@@ -155,6 +221,28 @@ class SubmissionRepository
     return is_array($rows) ? array_map(fn ($r) => $this->hydrate($r), $rows) : [];
   }
 
+  /**
+   * @param array<string, mixed> $filters
+   * @return list<array<string, mixed>>
+   */
+  public function exportForUser(int $userId, array $filters = []): array
+  {
+    [$where, $params] = $this->buildWhereForUser($userId, $filters);
+
+    $stmt = $this->db->query(
+      "SELECT s.*, f.name AS form_name, f.slug AS form_slug 
+       FROM {$this->tblSubmissions} s
+       INNER JOIN {$this->tblForms} f ON f.id = s.form_id
+       WHERE {$where}
+       ORDER BY s.created_at DESC",
+      $params
+    );
+
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    return is_array($rows) ? array_map(fn ($r) => $this->hydrate($r), $rows) : [];
+  }
+
   public function markRead(int $submissionId, int $formId, int $userId): void
   {
     if ($this->findForForm($submissionId, $formId, $userId) === null) {
@@ -167,6 +255,59 @@ class SubmissionRepository
     );
   }
 
+  public function unreadCount(int $userId): int
+  {
+    $row = $this->db->fetchOne(
+      "SELECT COUNT(*) AS cnt
+       FROM {$this->tblSubmissions} s
+       INNER JOIN {$this->tblForms} f ON f.id = s.form_id
+       WHERE f.user_id = ? AND s.is_read = 0 AND s.is_spam = 0",
+      [$userId]
+    );
+
+    return (int) ($row['cnt'] ?? 0);
+  }
+
+  /**
+   * @return list<array<string, mixed>>
+   */
+  public function notesFor(int $submissionId, int $formId, int $userId): array
+  {
+    if ($this->findForForm($submissionId, $formId, $userId) === null) {
+      return [];
+    }
+
+    $tbl = Db::table('submission_notes', $this->config);
+    $tblUsers = Db::table('users', $this->config);
+    $stmt = $this->db->query(
+      "SELECT n.id, n.body, n.created_at, u.name AS author
+       FROM {$tbl} n
+       INNER JOIN {$tblUsers} u ON u.id = n.user_id
+       WHERE n.submission_id = ?
+       ORDER BY n.created_at ASC",
+      [$submissionId]
+    );
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    return is_array($rows) ? $rows : [];
+  }
+
+  public function addNote(int $submissionId, int $formId, int $userId, string $body): bool
+  {
+    $body = trim($body);
+    if ($body === '' || $this->findForForm($submissionId, $formId, $userId) === null) {
+      return false;
+    }
+
+    $tbl = Db::table('submission_notes', $this->config);
+    $this->db->query(
+      "INSERT INTO {$tbl} (submission_id, user_id, body, created_at) VALUES (?, ?, ?, UTC_TIMESTAMP())",
+      [$submissionId, $userId, $body]
+    );
+
+    return true;
+  }
+
   /**
    * @param array<string, mixed> $filters
    * @return array{0: string, 1: list<mixed>}
@@ -175,6 +316,53 @@ class SubmissionRepository
   {
     $where = 's.form_id = ?';
     $params = [$formId];
+
+    if (isset($filters['is_spam'])) {
+      $where .= ' AND s.is_spam = ?';
+      $params[] = (int) $filters['is_spam'];
+    }
+
+    if (isset($filters['is_read']) && $filters['is_read'] !== '') {
+      $where .= ' AND s.is_read = ?';
+      $params[] = (int) $filters['is_read'];
+    }
+
+    if (isset($filters['is_starred']) && $filters['is_starred'] !== '') {
+      $where .= ' AND s.is_starred = ?';
+      $params[] = (int) $filters['is_starred'];
+    }
+
+    if (!empty($filters['date_from'])) {
+      $where .= ' AND s.created_at >= ?';
+      $params[] = $filters['date_from'] . ' 00:00:00';
+    }
+
+    if (!empty($filters['date_to'])) {
+      $where .= ' AND s.created_at <= ?';
+      $params[] = $filters['date_to'] . ' 23:59:59';
+    }
+
+    if (!empty($filters['q'])) {
+      $where .= ' AND s.data_json LIKE ?';
+      $params[] = '%' . str_replace(['%', '_'], ['\\%', '\\_'], (string) $filters['q']) . '%';
+    }
+
+    return [$where, $params];
+  }
+
+  /**
+   * @param array<string, mixed> $filters
+   * @return array{0: string, 1: list<mixed>}
+   */
+  private function buildWhereForUser(int $userId, array $filters): array
+  {
+    $where = 'f.user_id = ?';
+    $params = [$userId];
+
+    if (!empty($filters['form_id'])) {
+      $where .= ' AND s.form_id = ?';
+      $params[] = (int) $filters['form_id'];
+    }
 
     if (isset($filters['is_spam'])) {
       $where .= ' AND s.is_spam = ?';

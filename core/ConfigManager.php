@@ -49,6 +49,16 @@ class ConfigManager
   public function save(array $patch): bool
   {
     $merged = array_replace_recursive($this->config, $patch);
+
+    if (isset($patch['security']) && is_array($patch['security'])) {
+      $merged['security'] = array_merge(self::defaultSecurity(), $patch['security']);
+    }
+
+    if (isset($patch['smtp']) && is_array($patch['smtp'])) {
+      $currentSmtp = is_array($this->config['smtp'] ?? null) ? $this->config['smtp'] : [];
+      $merged['smtp'] = array_merge($currentSmtp, $patch['smtp']);
+    }
+
     $secret = (string) ($merged['app']['secret'] ?? '');
 
     if (isset($merged['smtp']['password'])) {

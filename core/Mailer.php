@@ -15,6 +15,8 @@ class Mailer
   /** @var array<string, mixed> */
   private array $config;
 
+  private string $lastError = '';
+
   /**
    * @param array<string, mixed> $config
    */
@@ -31,13 +33,25 @@ class Mailer
 
     $smtp = $this->resolveSmtpConfig();
     $app = $this->config['app'] ?? [];
+    $this->lastError = '';
 
     $mail = new PHPMailer(true);
 
     try {
+      $host = trim((string) ($smtp['host'] ?? ''));
+      $from = trim((string) ($smtp['from_email'] ?? ''));
+      if ($host === '') {
+        $this->lastError = 'SMTP host is empty.';
+        return false;
+      }
+      if ($from === '' || !filter_var($from, FILTER_VALIDATE_EMAIL)) {
+        $this->lastError = 'Set a valid From email in SMTP settings.';
+        return false;
+      }
+
       $mail->isSMTP();
-      $mail->Timeout = 5;
-      $mail->Host = (string) ($smtp['host'] ?? 'localhost');
+      $mail->Timeout = 20;
+      $mail->Host = $host;
       $mail->Port = (int) ($smtp['port'] ?? 587);
       $mail->SMTPAuth = !empty($smtp['username']);
       $mail->Username = (string) ($smtp['username'] ?? '');
@@ -54,7 +68,7 @@ class Mailer
       }
 
       $mail->setFrom(
-        (string) ($smtp['from_email'] ?? 'noreply@localhost'),
+        $from,
         (string) ($smtp['from_name'] ?? ($app['name'] ?? 'FormFlow'))
       );
       $mail->addAddress($to);
@@ -67,12 +81,18 @@ class Mailer
 
       return true;
     } catch (MailerException $e) {
+      $this->lastError = $e->getMessage();
       if (FORMFLOW_DEBUG) {
         error_log('FormFlow Mailer error: ' . $e->getMessage());
       }
 
       return false;
     }
+  }
+
+  public function lastError(): string
+  {
+    return $this->lastError;
   }
 
   /**

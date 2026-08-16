@@ -79,4 +79,36 @@ class ApiKeyRepository
 
     return $stmt->rowCount() > 0;
   }
+
+  /**
+   * @return array<string, mixed>|null authenticated user row
+   */
+  public function authenticate(string $rawKey): ?array
+  {
+    $rawKey = trim($rawKey);
+    if ($rawKey === '' || !str_starts_with($rawKey, 'ff_')) {
+      return null;
+    }
+
+    $hash = hash('sha256', $rawKey);
+    $row = $this->db->fetchOne(
+      "SELECT k.id AS key_id, k.user_id, u.*
+       FROM {$this->tbl} k
+       INNER JOIN " . Db::table('users', $this->config) . " u ON u.id = k.user_id
+       WHERE k.key_hash = ? AND k.revoked_at IS NULL
+       LIMIT 1",
+      [$hash]
+    );
+
+    if ($row === null) {
+      return null;
+    }
+
+    $this->db->query(
+      "UPDATE {$this->tbl} SET last_used_at = UTC_TIMESTAMP() WHERE id = ?",
+      [(int) $row['key_id']]
+    );
+
+    return $row;
+  }
 }

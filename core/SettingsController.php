@@ -37,6 +37,7 @@ class SettingsController
     $ok = $this->configManager->save([
       'app' => [
         'name' => trim((string) ($_POST['site_name'] ?? '')),
+        'url' => rtrim(trim((string) ($_POST['site_url'] ?? '')), '/'),
         'timezone' => trim((string) ($_POST['timezone'] ?? 'UTC')),
         'date_format' => trim((string) ($_POST['date_format'] ?? 'Y-m-d')),
         'locale' => trim((string) ($_POST['locale'] ?? 'en')),
@@ -92,13 +93,16 @@ class SettingsController
       redirect('/admin/settings?tab=smtp');
     }
 
-    $mailConfig = $this->config;
-    $mailConfig['smtp'] = $this->configManager->smtpForMailer();
-    $mailer = new Mailer($mailConfig);
+    $mailer = new Mailer($this->config);
     $sent = $mailer->send($to, 'FormFlow SMTP test', '<p>SMTP configuration is working.</p>');
 
     Csrf::rotate();
-    flash($sent ? 'success' : 'error', $sent ? 'Test email sent.' : 'Test email failed. Check SMTP settings.');
+    if ($sent) {
+      flash('success', 'Test email sent to ' . $to . '.');
+    } else {
+      $detail = $mailer->lastError();
+      flash('error', $detail !== '' ? 'Test email failed: ' . $detail : 'Test email failed. Check SMTP host, port, encryption, and password.');
+    }
     redirect('/admin/settings?tab=smtp');
   }
 
@@ -143,7 +147,13 @@ class SettingsController
     }
 
     $repo = new ApiKeyRepository($this->config);
-    $result = $repo->generate((int) $user['id'], (string) ($_POST['key_name'] ?? 'API Key'));
+    try {
+      $result = $repo->generate((int) $user['id'], (string) ($_POST['key_name'] ?? 'API Key'));
+    } catch (\Throwable $e) {
+      Csrf::rotate();
+      flash('error', 'Could not generate API key. Run database migrations if the api_keys table is missing.');
+      redirect('/admin/settings?tab=api');
+    }
 
     Csrf::rotate();
     if (!$result['success']) {
@@ -181,25 +191,101 @@ class SettingsController
   public function exportSql(): void
   {
     $this->requireAdmin();
-    $exporter = new BackupExporter($this->config);
-    $sql = $exporter->exportSql();
-
-    header('Content-Type: application/sql; charset=utf-8');
-    header('Content-Disposition: attachment; filename="formflow-backup-' . gmdate('Y-m-d') . '.sql"');
-    echo $sql;
-    exit;
+    $this->sendDownload(
+      'formflow-backup-' . gmdate('Y-m-d') . '.sql',
+      'application/sql; charset=utf-8',
+      (new BackupExporter($this->config))->exportSql()
+    );
   }
 
   public function exportJson(): void
   {
     $this->requireAdmin();
-    $exporter = new BackupExporter($this->config);
-    $json = $exporter->exportJson();
+    $this->sendDownload(
+      'formflow-backup-' . gmdate('Y-m-d') . '.json',
+      'application/json; charset=utf-8',
+      (new BackupExporter($this->config))->exportJson()
+    );
+  }
 
-    header('Content-Type: application/json; charset=utf-8');
-    header('Content-Disposition: attachment; filename="formflow-backup-' . gmdate('Y-m-d') . '.json"');
-    echo $json;
+  public function importBackup(): void
+  {
+    $this->requireAdmin();
+    if (!Csrf::verifyRequest()) {
+      flash('error', 'Invalid security token.');
+      redirect('/admin/settings?tab=backup');
+    }
+
+    $result = (new BackupImporter($this->config))->importUpload($_FILES['backup'] ?? []);
+    Csrf::rotate();
+    flash($result['ok'] ? 'success' : 'error', $result['message']);
+    redirect('/admin/settings?tab=backup');
+  }
+
+  private function sendDownload(string $filename, string $contentType, string $body): void
+  {
+    while (ob_get_level() > 0) {
+      ob_end_clean();
+    }
+
+    header('Content-Type: ' . $contentType);
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . (string) strlen($body));
+    header('Cache-Control: no-store');
+    echo $body;
     exit;
+  }
+
+  public function sendInvite(): void
+  {
+    $this->requireAdmin();
+    if (!Csrf::verifyRequest()) {
+      flash('error', 'Invalid security token.');
+      redirect('/admin/settings?tab=team');
+    }
+
+    $user = $this->auth->user();
+    if ($user === null) {
+      redirect('/login');
+    }
+
+    $email = (string) ($_POST['email'] ?? '');
+    $role = (string) ($_POST['role'] ?? 'editor');
+    $invites = new InviteRepository($this->config);
+    try {
+      $result = $invites->create((int) $user['id'], $email, $role);
+    } catch (\Throwable $e) {
+      Csrf::rotate();
+      flash('error', 'Could not create invite. Check that the invites table exists.');
+      redirect('/admin/settings?tab=team');
+    }
+
+    if (!$result['success']) {
+      Csrf::rotate();
+      flash('error', $result['error'] ?? 'Could not create invite.');
+      redirect('/admin/settings?tab=team');
+    }
+
+    $link = app_url($this->config, '/invite/' . rawurlencode((string) $result['token']));
+    $_SESSION['_invite_link'] = $link;
+    $appName = (string) ($this->config['app']['name'] ?? 'FormFlow');
+    $mailer = new Mailer($this->config);
+    $sent = $mailer->send(
+      strtolower(trim($email)),
+      $appName . ' — You have been invited',
+      '<p>You have been invited to join ' . htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') . ' as <strong>' . htmlspecialchars($role, ENT_QUOTES, 'UTF-8') . '</strong>.</p>'
+      . '<p><a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">Accept invite</a></p>'
+      . '<p>This link expires in 7 days.</p>'
+    );
+
+    Csrf::rotate();
+    if ($sent) {
+      flash('success', 'Invite sent to ' . $email . '.');
+    } else {
+      $detail = $mailer->lastError();
+      flash('success', 'Invite created. Email was not sent' . ($detail !== '' ? ' (' . $detail . ')' : '') . '. Share this link: ' . $link);
+    }
+    redirect('/admin/settings?tab=team');
   }
 
   private function requireAdmin(): void

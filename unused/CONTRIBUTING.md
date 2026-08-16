@@ -25,9 +25,9 @@ php -S localhost:8000 router.php
 **Optional dev shortcuts** (after `config.php` exists):
 
 ```bash
-php core/migrate.php          # re-run migrations
+php unused/scripts/migrate.php          # re-run migrations
 php core/seed-templates.php   # seed template library
-php core/run-security-audit.php http://localhost:8000
+php unused/scripts/run-security-audit.php http://localhost:8000
 ```
 
 Use `router.php` as the router script — it mirrors Apache `.htaccess` behaviour and blocks sensitive paths.
@@ -70,7 +70,7 @@ Also verify the [Phase 6 hardening checklist](SECURITY_AUDIT.md):
 - [ ] Resources fetched by ID verify ownership (`findForUser`, equivalent joins)
 - [ ] State-changing POST requests verify CSRF
 - [ ] File uploads validated with `finfo` MIME (not extension alone)
-- [ ] Run `php core/run-security-audit.php` and `php core/security-idor-test.php`
+- [ ] Run `php unused/scripts/run-security-audit.php` and `php unused/scripts/security-idor-test.php`
 
 ## Reporting issues
 

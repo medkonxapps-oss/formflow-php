@@ -6,7 +6,7 @@ $form = [
     'id' => 0,
     'name' => '',
     'slug' => '',
-    'status' => 'active',
+    'status' => 'paused',
     'fields' => [],
     'settings' => \FormFlow\FormDefaults::settings(),
 ];

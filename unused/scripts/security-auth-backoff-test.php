@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /** @var array<string, mixed> $config */
-$config = require __DIR__ . '/bootstrap.php';
+$config = require dirname(__DIR__, 2) . '/core/bootstrap.php';
 
 use FormFlow\Auth;
 

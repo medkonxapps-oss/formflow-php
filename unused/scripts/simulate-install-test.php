@@ -5,16 +5,16 @@ declare(strict_types=1);
 /**
  * Simulate installer completion on an extracted release tree (CLI smoke test).
  *
- * Usage: php core/simulate-install-test.php /path/to/extracted/formflow
+ * Usage: php unused/scripts/simulate-install-test.php /path/to/extracted/formflow
  */
 
 $extracted = rtrim($argv[1] ?? '', '/\\');
 if ($extracted === '' || !is_dir($extracted)) {
-    fwrite(STDERR, "Usage: php core/simulate-install-test.php <extracted-root>\n");
+    fwrite(STDERR, "Usage: php unused/scripts/simulate-install-test.php <extracted-root>\n");
     exit(1);
 }
 
-$devConfig = dirname(__DIR__) . '/config.php';
+$devConfig = dirname(__DIR__, 2) . '/config.php';
 if (!is_readable($devConfig)) {
     echo "SKIP: simulate-install-test (no local config.php for DB credentials)\n";
     exit(0);

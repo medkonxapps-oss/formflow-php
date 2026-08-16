@@ -16,14 +16,22 @@ if ($form === null) {
     return;
 }
 
-$granularity = in_array($_GET['range'] ?? 'daily', ['daily', 'weekly', 'monthly'], true)
-    ? (string) $_GET['range']
+$rawRange = $_GET['range'] ?? 'daily';
+$granularity = in_array($rawRange, ['daily', 'weekly', 'monthly'], true)
+    ? (string) $rawRange
     : 'daily';
 
 $analytics = new AnalyticsRepository($config);
 $overTime = $analytics->submissionsOverTime($formId, $userId, $granularity);
 $referrers = $analytics->topReferrers($formId, $userId, 10);
 $totals = $analytics->formTotals($formId, $userId);
+$views = 0;
+try {
+    $views = (new \FormFlow\ViewTracker($config))->countForForm($formId, 90);
+} catch (\Throwable $e) {
+    $views = 0;
+}
+$conversion = $views > 0 ? round(($totals['total_submissions'] / $views) * 100, 1) : null;
 
 $chartLabels = json_encode(array_column($overTime, 'period'));
 $chartCounts = json_encode(array_column($overTime, 'count'));
@@ -32,7 +40,7 @@ $chartCounts = json_encode(array_column($overTime, 'count'));
 <div class="mb-6">
     <a href="/admin/forms/<?= $formId ?>/edit" class="text-sm text-zinc-500 hover:underline">&larr; Back to form</a>
     <h2 class="mt-2 text-2xl font-semibold text-zinc-900">Analytics — <?= e((string) $form['name']) ?></h2>
-    <p class="mt-1 text-sm text-zinc-500"><?= (int) $totals['total_submissions'] ?> submissions · <?= (int) $totals['spam'] ?> spam filtered</p>
+    <p class="mt-1 text-sm text-zinc-500"><?= (int) $totals['total_submissions'] ?> submissions · <?= (int) $totals['spam'] ?> spam filtered · <?= (int) $views ?> views<?= $conversion !== null ? ' · ' . $conversion . '% conversion' : '' ?></p>
 </div>
 
 <div class="mb-4 flex gap-2">
@@ -66,11 +74,15 @@ $chartCounts = json_encode(array_column($overTime, 'count'));
     </div>
 </div>
 
-<div class="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-6">
+<div class="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
     <h3 class="text-sm font-semibold text-zinc-900">Views vs. submissions (conversion)</h3>
     <p class="mt-2 text-sm text-zinc-600">
-        <strong>TODO:</strong> Conversion rate requires a view-tracking snippet on embedded forms (not yet implemented).
-        This chart will show views → submissions once page-view events are collected.
+        <?= (int) $views ?> unique-ish views in the last 90 days
+        <?php if ($conversion !== null): ?>
+            → <strong><?= e((string) $conversion) ?>%</strong> converted to submissions.
+        <?php else: ?>
+            — open the live form once to start collecting view data.
+        <?php endif; ?>
     </p>
 </div>
 

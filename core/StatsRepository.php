@@ -128,4 +128,65 @@ class StatsRepository
 
     return $result;
   }
+
+  /**
+   * @return list<array{form_id: int, form_name: string, submissions: int, spam: int}>
+   */
+  public function submissionsByForm(int $userId): array
+  {
+    $stmt = $this->db->query(
+      "SELECT f.id AS form_id, f.name AS form_name,
+              SUM(CASE WHEN s.is_spam = 0 THEN 1 ELSE 0 END) AS submissions,
+              SUM(CASE WHEN s.is_spam = 1 THEN 1 ELSE 0 END) AS spam
+       FROM {$this->tblForms} f
+       LEFT JOIN {$this->tblSubmissions} s ON s.form_id = f.id
+       WHERE f.user_id = ?
+       GROUP BY f.id, f.name
+       ORDER BY submissions DESC, f.name ASC",
+      [$userId]
+    );
+
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (!is_array($rows)) {
+      return [];
+    }
+
+    return array_map(static fn (array $r): array => [
+      'form_id' => (int) $r['form_id'],
+      'form_name' => (string) $r['form_name'],
+      'submissions' => (int) ($r['submissions'] ?? 0),
+      'spam' => (int) ($r['spam'] ?? 0),
+    ], $rows);
+  }
+
+  /**
+   * @return list<array{domain: string, count: int}>
+   */
+  public function topReferrers(int $userId, int $limit = 10): array
+  {
+    $limit = max(1, min(25, $limit));
+    $stmt = $this->db->query(
+      "SELECT
+         LOWER(
+           SUBSTRING_INDEX(
+             SUBSTRING_INDEX(REPLACE(REPLACE(REPLACE(s.referrer, 'https://', ''), 'http://', ''), 'www.', ''), '/', 1),
+             ':', 1
+           )
+         ) AS domain,
+         COUNT(*) AS cnt
+       FROM {$this->tblSubmissions} s
+       INNER JOIN {$this->tblForms} f ON f.id = s.form_id
+       WHERE f.user_id = ? AND s.referrer IS NOT NULL AND s.referrer != '' AND s.is_spam = 0
+       GROUP BY domain
+       ORDER BY cnt DESC
+       LIMIT {$limit}",
+      [$userId]
+    );
+
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    return is_array($rows)
+      ? array_map(static fn (array $r): array => ['domain' => (string) $r['domain'], 'count' => (int) $r['cnt']], $rows)
+      : [];
+  }
 }
