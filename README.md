@@ -7,19 +7,6 @@
 
 ---
 
-## Screenshots
-
-> Replace these placeholders with real assets before publishing the GitHub release.
-
-| Installer wizard | Admin dashboard |
-|------------------|-----------------|
-| ![Installer wizard — placeholder](unused/docs/images/installer-placeholder.svg) | ![Dashboard — placeholder](unused/docs/images/dashboard-placeholder.svg) |
-| *6-step setup: requirements → database → SMTP → admin → settings → done* | *Forms, submissions chart, recent activity* |
-
-<!-- GIF: docs/images/install-demo.gif — optional screen recording of full install -->
-
----
-
 ## Deploy in under 10 minutes
 
 ### 1. Get the code
@@ -60,12 +47,6 @@ Complete all six steps. The wizard writes `config.php`, runs migrations, and cre
 - Embed code: form **Edit → Embed** tab
 - Public endpoint: `POST /submit/{your-form-slug}`
 
-**Verify the package locally before upload:**
-
-```bash
-php unused/scripts/verify-release-package.php
-```
-
 ---
 
 ## Requirements
@@ -98,7 +79,7 @@ php unused/scripts/verify-release-package.php
 php -S localhost:8000 router.php
 ```
 
-Open [http://localhost:8000/install/](http://localhost:8000/install/) — no `config.php` needed. See [CONTRIBUTING.md](unused/CONTRIBUTING.md) for coding standards and PR checklist.
+Open [http://localhost:8000/install/](http://localhost:8000/install/) — no `config.php` needed.
 
 ---
 
@@ -117,11 +98,9 @@ Open [http://localhost:8000/install/](http://localhost:8000/install/) — no `co
 - **HTTPS:** Enable **SSL** in hPanel (Let’s Encrypt) and set `app.session_secure` to `true` in Settings after install
 - **`.htaccess`:** Hostinger Apache supports it by default; if URLs 404, confirm `mod_rewrite` is on
 
-Help others by filing a **[Hosting compatibility report](unused/github/ISSUE_TEMPLATE/hosting_compatibility_report.md)** issue.
-
 ### Can I use nginx?
 
-Yes, with rewrite rules equivalent to `.htaccess` (route requests to `index.php`, deny `/core`, `/includes`, `/unused`, `/uploads`, `config.php`). Apache examples ship in the repo.
+Yes, with rewrite rules equivalent to `.htaccess` (route requests to `index.php`, deny `/core`, `/includes`, `/uploads`, `config.php`). Apache examples ship in the repo.
 
 ### Is there a public signup page?
 
@@ -138,13 +117,6 @@ See the **Embed** tab on any form, or the examples in this README under [Public 
 ---
 
 ## Security
-
-- [SECURITY.md](unused/SECURITY.md) — authentication, sessions, CSRF, rate limits
-- [SECURITY_AUDIT.md](unused/SECURITY_AUDIT.md) — hardening audit (Phases 0–5) and automated tests
-
-```bash
-php unused/scripts/run-security-audit.php https://yourdomain.com
-```
 
 **Production:** set `app.debug` to `false` and `app.env` to `production` in Settings or `config.php`.
 
@@ -202,7 +174,6 @@ formflow/
 ├── templates/             # Layouts
 ├── includes/PHPMailer/    # Vendored mailer
 ├── uploads/               # Private file storage
-├── unused/                # Docs, GitHub templates, CLI tests (not needed to run)
 ├── LICENSE
 ├── CHANGELOG.md
 └── README.md
@@ -213,12 +184,6 @@ formflow/
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md). Current release: **v1.0.0**.
-
----
-
-## Contributing
-
-Contributions welcome! Read [CONTRIBUTING.md](unused/CONTRIBUTING.md) for PSR-12 style, local setup, and the security PR checklist.
 
 ---
 
