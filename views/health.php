@@ -22,7 +22,7 @@ foreach ($requiredExtensions as $ext) {
 }
 
 $phpVersion = PHP_VERSION;
-$phpVersionOk = version_compare($phpVersion, '7.4.0', '>=');
+$phpVersionOk = version_compare($phpVersion, '8.0.0', '>=');
 
 $dbResult = ['connected' => false, 'error' => 'pdo_mysql extension not loaded'];
 
@@ -39,7 +39,7 @@ $payload = [
     'php' => [
         'version' => $phpVersion,
         'ok' => $phpVersionOk,
-        'required' => '7.4.0+',
+        'required' => '8.0.0+',
     ],
     'extensions' => $extensionChecks,
     'database' => [

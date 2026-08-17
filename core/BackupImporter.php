@@ -211,6 +211,10 @@ class BackupImporter
       if ($data === '' || !preg_match('#^uploads/[0-9]+/[A-Za-z0-9._-]+$#', $path)) {
         continue;
       }
+      $basename = basename($path);
+      if ($basename[0] === '.') {
+        continue;
+      }
       $binary = base64_decode($data, true);
       if ($binary === false) {
         continue;

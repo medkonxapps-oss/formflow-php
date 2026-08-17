@@ -11,9 +11,19 @@ $repo = new FormRepository($config);
 $form = $repo->findPublicBySlugOrId($slug);
 
 if (!headers_sent()) {
-    header('Content-Security-Policy: frame-ancestors *');
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Private-Network: true');
+    $appUrl = rtrim((string) ($config['app']['url'] ?? ''), '/');
+    $origin = '';
+    if ($appUrl !== '') {
+        $origin = $appUrl;
+    } elseif (isset($_SERVER['HTTP_HOST'])) {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $origin = $scheme . '://' . $_SERVER['HTTP_HOST'];
+    }
+    header('Content-Security-Policy: frame-ancestors ' . ($origin !== '' ? $origin : "'self'"));
+    if ($origin !== '') {
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Vary: Origin');
+    }
 }
 
 if ($form === null || ($form['status'] ?? '') !== 'active') {

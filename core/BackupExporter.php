@@ -236,7 +236,6 @@ class BackupExporter
     return [
       'app' => [
         'name' => (string) ($app['name'] ?? 'FormFlow'),
-        'secret' => (string) ($app['secret'] ?? ''),
         'timezone' => (string) ($app['timezone'] ?? 'UTC'),
         'locale' => (string) ($app['locale'] ?? 'en'),
         'date_format' => (string) ($app['date_format'] ?? 'Y-m-d'),

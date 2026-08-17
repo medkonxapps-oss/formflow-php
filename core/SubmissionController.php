@@ -89,11 +89,12 @@ class SubmissionController
 
     $count = $this->submissions->bulkAction((int) $user['id'], $action, [$submissionId], $formId);
     Csrf::rotate();
-    flash($count > 0 ? 'success' : 'error', $count > 0 ? 'Submission updated.' : 'Could not update submission.');
 
     if ($action === 'delete') {
+      flash($count > 0 ? 'success' : 'error', $count > 0 ? 'Submission deleted.' : 'Could not delete submission.');
       redirect('/admin/submissions');
     }
+    flash($count > 0 ? 'success' : 'error', $count > 0 ? 'Submission updated.' : 'Could not update submission.');
     redirect('/admin/forms/' . $formId . '/submissions/' . $submissionId);
   }
 
@@ -176,9 +177,10 @@ class SubmissionController
 
     foreach ($rows as $row) {
       $data = is_array($row['data'] ?? null) ? $row['data'] : [];
+      $formName = (string) ($row['form_name'] ?? ($form['name'] ?? ''));
       $line = [
         (string) ($row['id'] ?? ''),
-        (string) ($row['form_name'] ?? ($form['name'] ?? '')),
+        $formName,
         (string) ($row['created_at'] ?? ''),
         (string) ($row['ip_address'] ?? ''),
         (string) ($row['referrer'] ?? ''),
@@ -305,11 +307,4 @@ class SubmissionController
     ];
   }
 
-  private function returnUrl(int $formId): string
-  {
-    $query = $_SERVER['QUERY_STRING'] ?? '';
-    $base = '/admin/forms/' . $formId . '/submissions';
-
-    return $query !== '' ? $base . '?' . $query : $base;
-  }
 }

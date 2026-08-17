@@ -21,9 +21,9 @@ class RequirementsChecker
   {
     $checks = [];
 
-    $phpOk = version_compare(PHP_VERSION, '7.4.0', '>=');
+    $phpOk = version_compare(PHP_VERSION, '8.0.0', '>=');
     $checks[] = [
-      'label' => 'PHP version (7.4+)',
+      'label' => 'PHP version (8.0+)',
       'status' => $phpOk ? 'pass' : 'fail',
       'message' => 'Current: ' . PHP_VERSION,
       'blocking' => true,

@@ -220,6 +220,8 @@ class FormController
       $settings = FormDefaults::settings();
     }
 
+    $defaults = FormDefaults::settings();
+
     $settings['success'] = [
       'type' => ($_POST['success_type'] ?? 'message') === 'redirect' ? 'redirect' : 'message',
       'message' => trim((string) ($_POST['success_message'] ?? '')),
@@ -236,6 +238,8 @@ class FormController
       'recaptcha_site_key' => trim((string) ($_POST['recaptcha_site_key'] ?? '')),
       'recaptcha_secret_key' => trim((string) ($_POST['recaptcha_secret_key'] ?? '')),
     ];
+    $settings['rate_limit'] = $settings['rate_limit'] ?? $defaults['rate_limit'];
+    $settings['uploads'] = $settings['uploads'] ?? $defaults['uploads'];
     $settings['allowed_domains'] = array_values($domains);
     $settings['webhook_url'] = trim((string) ($_POST['webhook_url'] ?? ''));
     $settings['theme'] = [

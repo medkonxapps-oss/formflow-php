@@ -108,7 +108,7 @@ class ApiController
       return trim($m[1]);
     }
 
-    return trim((string) ($_SERVER['HTTP_X_API_KEY'] ?? $_GET['api_key'] ?? ''));
+    return trim((string) ($_SERVER['HTTP_X_API_KEY'] ?? ''));
   }
 
   /**

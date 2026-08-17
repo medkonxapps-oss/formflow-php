@@ -76,8 +76,6 @@ class SubmissionService
       exit;
     }
 
-    $limiter->record((int) $form['id'], $ip);
-
     $payload = $this->parsePayload();
     $fields = is_array($form['fields'] ?? null) ? $form['fields'] : [];
     $spam = is_array($settings['spam'] ?? null) ? $settings['spam'] : [];
@@ -135,6 +133,8 @@ class SubmissionService
       }
     }
 
+    $limiter->record((int) $form['id'], $ip);
+
     $submissionId = $this->insertSubmission(
       (int) $form['id'],
       $this->normalizePayload($payload),
@@ -144,8 +144,9 @@ class SubmissionService
       $isHoneypotSpam
     );
 
-    $maxBytes = (int) (($settings['uploads']['max_bytes'] ?? null) ?: 5242880);
-    $storage = new FileStorage($this->config);
+    if (!$isHoneypotSpam) {
+      $maxBytes = (int) (($settings['uploads']['max_bytes'] ?? null) ?: 5242880);
+      $storage = new FileStorage($this->config);
 
     foreach ($fields as $field) {
       if (!is_array($field) || ($field['type'] ?? '') !== 'file') {
@@ -160,6 +161,8 @@ class SubmissionService
         $storage->store((int) $form['id'], $submissionId, $fieldId, $file, $maxBytes);
       }
     }
+
+    } // end if (!$isHoneypotSpam) file storage block
 
     $submission = [
       'id' => $submissionId,
@@ -313,7 +316,14 @@ class SubmissionService
     }
 
     if (($success['type'] ?? 'message') === 'redirect' && !empty($success['redirect_url'])) {
-      header('Location: ' . (string) $success['redirect_url'], true, 302);
+      $redir = (string) $success['redirect_url'];
+      $parsed = parse_url($redir);
+      $host = strtolower((string) ($parsed['host'] ?? ''));
+      $serverHost = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+      if ($host !== '' && $host !== $serverHost) {
+        $redir = '/';
+      }
+      header('Location: ' . $redir, true, 302);
       exit;
     }
 

@@ -477,6 +477,18 @@ class Auth
     if (strlen($password) < self::MIN_PASSWORD_LENGTH) {
       return 'Password must be at least ' . self::MIN_PASSWORD_LENGTH . ' characters.';
     }
+    if (!preg_match('/[A-Z]/', $password)) {
+      return 'Password must contain at least one uppercase letter.';
+    }
+    if (!preg_match('/[a-z]/', $password)) {
+      return 'Password must contain at least one lowercase letter.';
+    }
+    if (!preg_match('/[0-9]/', $password)) {
+      return 'Password must contain at least one digit.';
+    }
+    if (!preg_match('/[^A-Za-z0-9]/', $password)) {
+      return 'Password must contain at least one special character.';
+    }
 
     return null;
   }
@@ -730,7 +742,7 @@ class Auth
   {
     $secret = (string) ($this->config['app']['secret'] ?? '');
 
-    return hash_hmac('sha256', $ip . '|' . $userAgent, $secret);
+    return hash_hmac('sha256', $userAgent, $secret);
   }
 
   private function clientIp(): string

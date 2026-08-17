@@ -24,6 +24,12 @@ class WebhookClient
       return;
     }
 
+    $parsed = parse_url($url);
+    $host = strtolower((string) ($parsed['host'] ?? ''));
+    if ($host === '' || self::isPrivateHost($host)) {
+      return;
+    }
+
     $payload = json_encode([
       'form_id' => $form['id'] ?? null,
       'form_slug' => $form['slug'] ?? null,
@@ -48,5 +54,19 @@ class WebhookClient
     ]);
 
     @file_get_contents($url, false, $context);
+  }
+
+  private static function isPrivateHost(string $host): bool
+  {
+    if ($host === 'localhost' || $host === '0.0.0.0' || $host === '::1' || str_ends_with($host, '.local')) {
+      return true;
+    }
+
+    $ip = gethostbyname($host);
+    if ($ip === $host) {
+      return false;
+    }
+
+    return !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
   }
 }

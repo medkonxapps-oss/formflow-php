@@ -82,8 +82,7 @@ class Router
     $pageTitle = $route['title'] ?? $this->config['app']['name'] ?? 'FormFlow';
     $appName = $this->config['app']['name'] ?? 'FormFlow';
     $config = $this->config;
-    $auth = new Auth($this->config);
-    $currentUser = $auth->user();
+    $currentUser = (new Auth($this->config))->user();
 
     require $layoutFile;
   }
@@ -293,8 +292,7 @@ class Router
     /** @var array<string, mixed> $config */
     $config = $this->config;
     $routeParams = $this->routeParams;
-    $auth = new Auth($this->config);
-    $currentUser = $auth->user();
+    $currentUser = (new Auth($this->config))->user();
     require $viewFile;
 
     return (string) ob_get_clean();

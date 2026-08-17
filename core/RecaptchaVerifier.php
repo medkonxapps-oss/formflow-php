@@ -45,6 +45,16 @@ class RecaptchaVerifier
       return 'unavailable';
     }
 
-    return !empty($data['success']) ? 'ok' : 'invalid';
+    if (empty($data['success'])) {
+      return 'invalid';
+    }
+
+    $expectedHost = (string) parse_url('https://' . ($_SERVER['HTTP_HOST'] ?? ''), PHP_URL_HOST);
+    $hostname = (string) ($data['hostname'] ?? '');
+    if ($expectedHost !== '' && $hostname !== '' && $hostname !== $expectedHost) {
+      return 'invalid';
+    }
+
+    return 'ok';
   }
 }

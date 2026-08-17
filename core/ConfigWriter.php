@@ -19,6 +19,11 @@ class ConfigWriter
       return false;
     }
 
+    $database = $data['database'] ?? [];
+    if (empty($database['name']) || empty($database['user'])) {
+      return false;
+    }
+
     $app = $data['app'] ?? [];
     $database = $data['database'] ?? [];
     $smtp = $data['smtp'] ?? [];

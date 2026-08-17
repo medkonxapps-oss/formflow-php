@@ -158,16 +158,17 @@ class AbTestRepository
             return false;
         }
 
+        $tblForms = Db::table('forms', $this->config);
+
         // If winner is a non-control variant, copy its fields/settings to the main form
         if (!$variant['is_control'] && $variant['fields_json'] !== null) {
             $this->db->query(
-                'UPDATE forms SET fields_json = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+                "UPDATE {$tblForms} SET fields_json = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?",
                 [$variant['fields_json'], $formId]
             );
         }
         if (!$variant['is_control'] && $variant['settings_json'] !== null) {
-            // Merge ab_test.enabled = false into existing settings
-            $formRow = $this->db->fetchOne('SELECT settings_json FROM forms WHERE id = ?', [$formId]);
+            $formRow = $this->db->fetchOne("SELECT settings_json FROM {$tblForms} WHERE id = ?", [$formId]);
             $settings = json_decode((string) ($formRow['settings_json'] ?? '{}'), true);
             if (!is_array($settings)) {
                 $settings = [];
@@ -178,19 +179,18 @@ class AbTestRepository
             }
             $settings['ab_test']['enabled'] = false;
             $this->db->query(
-                'UPDATE forms SET settings_json = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+                "UPDATE {$tblForms} SET settings_json = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?",
                 [json_encode($settings), $formId]
             );
         } else {
-            // Just disable A/B test in settings
-            $formRow = $this->db->fetchOne('SELECT settings_json FROM forms WHERE id = ?', [$formId]);
+            $formRow = $this->db->fetchOne("SELECT settings_json FROM {$tblForms} WHERE id = ?", [$formId]);
             $settings = json_decode((string) ($formRow['settings_json'] ?? '{}'), true);
             if (!is_array($settings)) {
                 $settings = [];
             }
             $settings['ab_test']['enabled'] = false;
             $this->db->query(
-                'UPDATE forms SET settings_json = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+                "UPDATE {$tblForms} SET settings_json = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?",
                 [json_encode($settings), $formId]
             );
         }

@@ -12,7 +12,7 @@ class FileStorage
   /** @var list<string> */
   private const ALLOWED_MIMES = [
     'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-    'application/pdf', 'text/plain',
+    'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   ];
@@ -144,7 +144,6 @@ class FileStorage
       'image/gif' => 'gif',
       'image/webp' => 'webp',
       'application/pdf' => 'pdf',
-      'text/plain' => 'txt',
       'application/msword' => 'doc',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
       default => '',

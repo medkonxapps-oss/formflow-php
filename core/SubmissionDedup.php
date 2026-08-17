@@ -72,7 +72,16 @@ class SubmissionDedup
   private function hash(int $formId, array $payload, string $ip): string
   {
     ksort($payload);
-    $normalized = json_encode($payload, JSON_UNESCAPED_UNICODE);
+    foreach ($payload as $key => $value) {
+      if (is_array($value)) {
+        $payload[$key] = array_values(array_map(
+          static fn($v) => is_array($v) ? json_encode($v, JSON_UNESCAPED_UNICODE | JSON_SORT_KEYS) : $v,
+          $value
+        ));
+        sort($payload[$key]);
+      }
+    }
+    $normalized = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_SORT_KEYS);
 
     return hash('sha256', $formId . '|' . $normalized . '|' . $ip);
   }
