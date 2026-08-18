@@ -65,15 +65,18 @@ class SubmissionService
     $perMinute = max(1, min($formLimit, max(1, $globalLimit)));
 
     $limiter = new SubmissionRateLimiter($this->config);
-    if ($limiter->isLimited((int) $form['id'], $ip, $perMinute)) {
-      http_response_code(429);
-      if ($wantsJson) {
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['success' => false, 'message' => 'Too many requests. Please try again later.']);
-      } else {
-        echo 'Too many requests.';
+    try {
+      if ($limiter->isLimited((int) $form['id'], $ip, $perMinute)) {
+        http_response_code(429);
+        if ($wantsJson) {
+          header('Content-Type: application/json; charset=utf-8');
+          echo json_encode(['success' => false, 'message' => 'Too many requests. Please try again later.']);
+        } else {
+          echo 'Too many requests.';
+        }
+        exit;
       }
-      exit;
+    } catch (\Throwable) {
     }
 
     $payload = $this->parsePayload();
@@ -95,14 +98,8 @@ class SubmissionService
         $failMode = (string) ($spam['recaptcha_fail_mode'] ?? 'closed');
 
         if ($result === 'invalid' || ($result === 'unavailable' && $failMode === 'closed')) {
-          $this->respondError($wantsJson, 422, ['_form' => 'CAPTCHA verification failed.'], 'CAPTCHA verification failed.');
+          $this->respondError($wantsJson, 422, ['_form' => 'CAPTCHA verification failed.'], 'CAPTCHA verification failed.', $form);
         }
-      }
-
-      $dedup = new SubmissionDedup($this->config);
-      $cached = $dedup->findDuplicate((int) $form['id'], $this->normalizePayload($payload), $ip);
-      if ($cached !== null) {
-        $this->sendSuccessResponse($form, $cached, $wantsJson);
       }
 
       $errors = FormValidator::validate($fields, $payload);
@@ -129,20 +126,27 @@ class SubmissionService
       }
 
       if ($errors !== []) {
-        $this->respondError($wantsJson, 422, $errors, 'Validation failed.');
+        $this->respondError($wantsJson, 422, $errors, 'Validation failed.', $form);
       }
     }
 
-    $limiter->record((int) $form['id'], $ip);
+    try {
+      $limiter->record((int) $form['id'], $ip);
+    } catch (\Throwable) {
+    }
 
-    $submissionId = $this->insertSubmission(
-      (int) $form['id'],
-      $this->normalizePayload($payload),
-      $ip,
-      $userAgent,
-      $referrer,
-      $isHoneypotSpam
-    );
+    try {
+      $submissionId = $this->insertSubmission(
+        (int) $form['id'],
+        $this->normalizePayload($payload),
+        $ip,
+        $userAgent,
+        $referrer,
+        $isHoneypotSpam
+      );
+    } catch (\Throwable $e) {
+      $this->respondError($wantsJson, 500, [], FORMFLOW_DEBUG ? $e->getMessage() : 'Could not save submission.');
+    }
 
     if (!$isHoneypotSpam) {
       $maxBytes = (int) (($settings['uploads']['max_bytes'] ?? null) ?: 5242880);
@@ -197,13 +201,16 @@ class SubmissionService
     }
 
     $success = $this->buildSuccessResponse($form);
-    (new SubmissionDedup($this->config))->store(
-      (int) $form['id'],
-      $this->normalizePayload($payload),
-      $ip,
-      $submissionId,
-      $success
-    );
+    try {
+      (new SubmissionDedup($this->config))->store(
+        (int) $form['id'],
+        $this->normalizePayload($payload),
+        $ip,
+        $submissionId,
+        $success
+      );
+    } catch (\Throwable) {
+    }
 
     $this->sendSuccessResponse($form, $success, $wantsJson);
   }
@@ -306,12 +313,14 @@ class SubmissionService
     $settings = is_array($form['settings'] ?? null) ? $form['settings'] : [];
     $success = is_array($settings['success'] ?? null) ? $settings['success'] : [];
 
+    $message = (string) ($response['message'] ?? $success['message'] ?? 'Thank you!');
+
     if ($wantsJson) {
       header('Content-Type: application/json; charset=utf-8');
       echo json_encode([
         'success' => true,
-        'message' => $response['message'] ?? $success['message'] ?? 'Thank you!',
-      ], JSON_UNESCAPED_UNICODE);
+        'message' => $message,
+      ]);
       exit;
     }
 
@@ -319,40 +328,48 @@ class SubmissionService
       $redir = (string) $success['redirect_url'];
       $parsed = parse_url($redir);
       $host = strtolower((string) ($parsed['host'] ?? ''));
-      $serverHost = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
-      if ($host !== '' && $host !== $serverHost) {
-        $redir = '/';
+      if ($host !== '' && !self::hostsMatch($host, (string) ($_SERVER['HTTP_HOST'] ?? ''))) {
+        $redir = self::previewPath($form);
       }
       header('Location: ' . $redir, true, 302);
       exit;
     }
 
-    $message = htmlspecialchars((string) ($response['message'] ?? $success['message'] ?? 'Thank you!'), ENT_QUOTES, 'UTF-8');
+    $preview = self::previewPath($form);
+    if ($preview !== '/') {
+      header('Location: ' . $preview . '?submitted=1', true, 302);
+      exit;
+    }
+
+    $safe = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
     http_response_code(200);
     header('Content-Type: text/html; charset=utf-8');
-    echo '<!DOCTYPE html><html><head><title>Thank you</title></head><body><p>' . $message . '</p></body></html>';
+    echo '<!DOCTYPE html><html><head><title>Thank you</title></head><body><p>' . $safe . '</p></body></html>';
     exit;
   }
 
   /**
    * @param array<string, string> $errors
+   * @param array<string, mixed>|null $form
    * @return never
    */
-  private function respondError(bool $wantsJson, int $code, array $errors, string $message): void
+  private function respondError(bool $wantsJson, int $code, array $errors, string $message, ?array $form = null): void
   {
     http_response_code($code);
 
     if ($wantsJson) {
       header('Content-Type: application/json; charset=utf-8');
-      echo json_encode(['success' => false, 'message' => $message, 'errors' => $errors], JSON_UNESCAPED_UNICODE);
+      echo json_encode(['success' => false, 'message' => $message, 'errors' => $errors]);
       exit;
     }
 
     if ($code === 422 && $errors !== []) {
       $_SESSION['_submit_errors'] = $errors;
-      $referer = self::safeReferer((string) ($_SERVER['HTTP_REFERER'] ?? ''));
-      header('Location: ' . $referer, true, 302);
-      exit;
+      $preview = $form !== null ? self::previewPath($form) : '/';
+      if ($preview !== '/') {
+        header('Location: ' . $preview, true, 302);
+        exit;
+      }
     }
 
     header('Content-Type: text/html; charset=utf-8');
@@ -385,10 +402,10 @@ class SubmissionService
       return '/';
     }
 
-    $host = strtolower((string) ($parsed['host'] ?? ''));
-    $serverHost = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    $host = self::normalizeHost((string) ($parsed['host'] ?? ''));
+    $serverHost = self::normalizeHost((string) ($_SERVER['HTTP_HOST'] ?? ''));
 
-    if ($host === '' || $serverHost === '' || $host !== $serverHost) {
+    if ($host === '' || $serverHost === '' || !self::hostsMatch($host, $serverHost)) {
       return '/';
     }
 
@@ -396,5 +413,33 @@ class SubmissionService
     $query = isset($parsed['query']) ? '?' . $parsed['query'] : '';
 
     return $path . $query;
+  }
+
+  /**
+   * @param array<string, mixed> $form
+   */
+  private static function previewPath(array $form): string
+  {
+    $slug = trim((string) ($form['slug'] ?? ''));
+    if ($slug === '') {
+      return '/';
+    }
+
+    return '/preview/' . rawurlencode($slug);
+  }
+
+  private static function normalizeHost(string $host): string
+  {
+    $host = strtolower(trim($host));
+    if (str_contains($host, ':')) {
+      $host = explode(':', $host, 2)[0];
+    }
+
+    return $host === '127.0.0.1' || $host === '::1' ? 'localhost' : $host;
+  }
+
+  private static function hostsMatch(string $a, string $b): bool
+  {
+    return self::normalizeHost($a) === self::normalizeHost($b);
   }
 }

@@ -83,9 +83,25 @@ $embed    = EmbedGenerator::generate($form, $config);
 $formHtml = $embed['inline_html'] ?? $embed['html'];
 $formName = (string) ($form['name'] ?? 'Form');
 $abLabel  = is_array($abVariant) ? (string) ($abVariant['name'] ?? '') : '';
+$submitErrors = $_SESSION['_submit_errors'] ?? [];
+unset($_SESSION['_submit_errors']);
+$justSubmitted = isset($_GET['submitted']);
 ?>
 
 <div class="mx-auto max-w-3xl px-4 py-6">
+    <?php if ($justSubmitted): ?>
+        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Thank you. Your submission was received.</div>
+    <?php endif; ?>
+    <?php if (is_array($submitErrors) && $submitErrors !== []): ?>
+        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <p class="font-medium">Please fix the following:</p>
+            <ul class="mt-1 list-disc pl-5">
+                <?php foreach ($submitErrors as $err): ?>
+                    <li><?= e((string) $err) ?></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    <?php endif; ?>
     <?php if ($abLabel !== ''): ?>
         <p class="mb-3 text-center text-xs text-gray-500">Showing variant: <strong><?= e($abLabel) ?></strong></p>
     <?php endif; ?>

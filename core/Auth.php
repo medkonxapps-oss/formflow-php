@@ -716,7 +716,7 @@ class Auth
       [
         $userId,
         $action,
-        $meta === null ? null : json_encode($meta, JSON_UNESCAPED_UNICODE),
+        $meta === null ? null : json_encode($meta, \JSON_UNESCAPED_UNICODE),
         $this->clientIp(),
       ]
     );

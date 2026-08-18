@@ -404,7 +404,7 @@ class InstallController
   {
     header('Content-Type: application/json; charset=utf-8');
     try {
-      echo json_encode($callback(), JSON_UNESCAPED_UNICODE);
+      echo json_encode($callback(), \JSON_UNESCAPED_UNICODE);
     } catch (\Throwable $e) {
       http_response_code(500);
       echo json_encode(['success' => false, 'error' => 'Server error.']);

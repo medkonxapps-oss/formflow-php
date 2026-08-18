@@ -265,7 +265,7 @@ class SubmissionController
       $parts = [];
       foreach ($value as $item) {
         if (is_array($item)) {
-          $parts[] = json_encode($item, JSON_UNESCAPED_UNICODE);
+          $parts[] = json_encode($item, \JSON_UNESCAPED_UNICODE);
         } else {
           $parts[] = (string) $item;
         }

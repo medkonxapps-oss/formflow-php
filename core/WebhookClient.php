@@ -37,7 +37,7 @@ class WebhookClient
       'data' => $submission['data'] ?? [],
       'ip_address' => $submission['ip_address'] ?? null,
       'created_at' => $submission['created_at'] ?? null,
-    ], JSON_UNESCAPED_UNICODE);
+    ], \JSON_UNESCAPED_UNICODE);
 
     if ($payload === false) {
       return;

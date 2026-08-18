@@ -28,6 +28,11 @@ class JsonColumn
    */
   public static function encode(array $data): string
   {
-    return json_encode($data, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    $json = json_encode($data);
+    if (!is_string($json) || $json === '') {
+      return '{}';
+    }
+
+    return $json;
   }
 }

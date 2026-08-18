@@ -132,7 +132,7 @@ class BackupExporter
   public function exportJson(): string
   {
     $payload = $this->payload();
-    $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    $json = json_encode($payload, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE | \JSON_INVALID_UTF8_SUBSTITUTE);
 
     return is_string($json) ? $json : '{}';
   }

@@ -21,7 +21,8 @@ class CorsHandler
     $settings = is_array($form['settings'] ?? null) ? $form['settings'] : [];
     $allowed = is_array($settings['allowed_domains'] ?? null) ? $settings['allowed_domains'] : [];
     $appUrl = rtrim((string) ($config['app']['url'] ?? ''), '/');
-    $appHost = parse_url($appUrl, PHP_URL_HOST) ?: '';
+    $appHost = strtolower((string) (parse_url($appUrl, PHP_URL_HOST) ?: ''));
+    $requestHost = strtolower((string) preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')));
 
     header('Vary: Origin');
     header('Access-Control-Allow-Methods: POST, OPTIONS');
@@ -32,10 +33,16 @@ class CorsHandler
       return true;
     }
 
-    if ($allowed === []) {
-      $originHost = parse_url($origin, PHP_URL_HOST) ?: '';
+    $originHost = strtolower((string) (parse_url($origin, PHP_URL_HOST) ?: ''));
 
-      if ($originHost !== '' && strcasecmp($originHost, $appHost) === 0) {
+    if ($originHost !== '' && $requestHost !== '' && strcasecmp($originHost, $requestHost) === 0) {
+      header('Access-Control-Allow-Origin: ' . $origin);
+
+      return true;
+    }
+
+    if ($allowed === []) {
+      if ($originHost !== '' && $appHost !== '' && strcasecmp($originHost, $appHost) === 0) {
         header('Access-Control-Allow-Origin: ' . $origin);
 
         return true;

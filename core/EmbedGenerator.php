@@ -30,8 +30,9 @@ class EmbedGenerator
       $baseUrl = rtrim(app_url($config, '/'), '/');
     }
     $slug = (string) ($form['slug'] ?? '');
-    $endpoint = $baseUrl . '/submit/' . rawurlencode($slug);
-    $hosted = $baseUrl . '/preview/' . rawurlencode($slug);
+    $submitPath = '/submit/' . rawurlencode($slug);
+    $endpoint = $baseUrl !== '' ? $baseUrl . $submitPath : $submitPath;
+    $hosted = ($baseUrl !== '' ? $baseUrl : '') . '/preview/' . rawurlencode($slug);
 
     $settings = is_array($form['settings'] ?? null) ? $form['settings'] : FormDefaults::settings();
     $theme = is_array($settings['theme'] ?? null) ? $settings['theme'] : (FormDefaults::settings()['theme'] ?? []);
@@ -182,7 +183,8 @@ class EmbedGenerator
     $spam = is_array($settings['spam'] ?? null) ? $settings['spam'] : [];
     $honeypot = '';
     if (!empty($spam['honeypot'])) {
-      $honeypot = "  <div style=\"display:none\"><label>Leave blank<input type=\"text\" name=\"_honeypot\" tabindex=\"-1\" autocomplete=\"off\"></label></div>";
+      $honeypot = "  <div aria-hidden=\"true\" style=\"position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden\">"
+        . "<label>Leave blank<input type=\"text\" name=\"_honeypot\" value=\"\" tabindex=\"-1\" autocomplete=\"off\"></label></div>";
     }
 
     $formStyle = "max-width:{$maxWidth}px;margin:0 auto;padding:1.5rem;background:{$bgColor};border-radius:{$radius}px;font-family:{$fontFamily}";
@@ -190,7 +192,7 @@ class EmbedGenerator
 
     $logicScript = '';
     if ($conditionals !== []) {
-      $rulesJson = json_encode($conditionals, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+      $rulesJson = json_encode($conditionals, \JSON_HEX_TAG | \JSON_HEX_APOS | \JSON_HEX_QUOT | \JSON_HEX_AMP);
       $logicScript = "\n<script>\n(function(){\n"
         . "var rules={$rulesJson};\n"
         . "var form=document.currentScript.previousElementSibling;\n"
@@ -205,13 +207,13 @@ class EmbedGenerator
     $trackUrl = $baseUrl . '/track/' . rawurlencode($slug);
     $trackScript = "\n<script>(function(){try{fetch(" . json_encode($trackUrl) . ",{method:'POST',mode:'no-cors',keepalive:true});}catch(e){}}())</script>";
 
-    $html = "<form class=\"ff-form\" action=\"{$endpoint}\" method=\"POST\" enctype=\"multipart/form-data\" style=\"{$formStyle}\">\n"
+    $html = "<form class=\"ff-form\" action=\"{$submitPath}\" method=\"POST\" enctype=\"multipart/form-data\" style=\"{$formStyle}\">\n"
       . implode("\n", $htmlFields) . "\n"
       . $honeypot . "\n"
       . "  <button type=\"submit\" style=\"{$btnStyle}\">{$btnText}</button>\n"
       . '</form>' . $logicScript . $trackScript;
 
-    $jsonExample = json_encode($jsonFields, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    $jsonExample = json_encode($jsonFields, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE);
     $fetch = "fetch(" . json_encode($endpoint) . ", {\n"
       . "  method: 'POST',\n"
       . "  headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },\n"
@@ -245,7 +247,7 @@ class EmbedGenerator
     $curl = 'curl -X POST ' . json_encode($endpoint) . " \\\n"
       . "  -H \"Content-Type: application/json\" \\\n"
       . "  -H \"Accept: application/json\" \\\n"
-      . '  -d \'' . str_replace("'", "'\\''", (string) json_encode($jsonFields, JSON_UNESCAPED_UNICODE)) . "'";
+      . '  -d \'' . str_replace("'", "'\\''", (string) json_encode($jsonFields, \JSON_UNESCAPED_UNICODE)) . "'";
 
     $snippetHtml = $html;
     if (!empty($settings['ab_test']['enabled'])) {

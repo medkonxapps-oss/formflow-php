@@ -137,7 +137,7 @@ class ApiController
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
     header('X-Content-Type-Options: nosniff');
-    echo json_encode($payload, JSON_UNESCAPED_SLASHES);
+    echo json_encode($payload, \JSON_UNESCAPED_SLASHES);
     exit;
   }
 }

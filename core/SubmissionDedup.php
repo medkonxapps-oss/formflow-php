@@ -62,7 +62,7 @@ class SubmissionDedup
       "INSERT INTO {$this->tbl} (dedup_hash, submission_id, response_json, created_at, expires_at)
        VALUES (?, ?, ?, UTC_TIMESTAMP(), ?)
        ON DUPLICATE KEY UPDATE submission_id = VALUES(submission_id), response_json = VALUES(response_json), expires_at = VALUES(expires_at)",
-      [$hash, $submissionId, json_encode($response, JSON_UNESCAPED_UNICODE), $expires]
+      [$hash, $submissionId, json_encode($response), $expires]
     );
   }
 
@@ -71,18 +71,34 @@ class SubmissionDedup
    */
   private function hash(int $formId, array $payload, string $ip): string
   {
-    ksort($payload);
-    foreach ($payload as $key => $value) {
-      if (is_array($value)) {
-        $payload[$key] = array_values(array_map(
-          static fn($v) => is_array($v) ? json_encode($v, JSON_UNESCAPED_UNICODE | JSON_SORT_KEYS) : $v,
-          $value
-        ));
-        sort($payload[$key]);
-      }
-    }
-    $normalized = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_SORT_KEYS);
+    $normalized = json_encode(self::sortDeep($payload));
 
-    return hash('sha256', $formId . '|' . $normalized . '|' . $ip);
+    return hash('sha256', $formId . '|' . (string) $normalized . '|' . $ip);
+  }
+
+  /**
+   * @param mixed $value
+   * @return mixed
+   */
+  private static function sortDeep($value)
+  {
+    if (!is_array($value)) {
+      return $value;
+    }
+
+    $isList = $value === [] || array_keys($value) === range(0, count($value) - 1);
+    foreach ($value as $key => $item) {
+      $value[$key] = self::sortDeep($item);
+    }
+
+    if ($isList) {
+      sort($value);
+
+      return array_values($value);
+    }
+
+    ksort($value);
+
+    return $value;
   }
 }

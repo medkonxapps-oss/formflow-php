@@ -24,7 +24,7 @@ class FormValidator
       }
 
       $type = (string) ($field['type'] ?? '');
-      if (in_array($type, ['heading', 'paragraph'], true)) {
+      if (in_array($type, ['heading', 'paragraph', 'divider', 'image', 'html', 'video', 'hidden'], true)) {
         continue;
       }
 
